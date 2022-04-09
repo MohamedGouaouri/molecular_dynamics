@@ -20,4 +20,4 @@ The kinetic energy formula is stated as follows:
 $K = \frac{1}{2} m.v^{2}$  
 
 
-![formula](https://render.githubusercontent.com/render/math?math=e^{i \pi} = -1)
+![formula](https://render.githubusercontent.com/render/math?math=e^{i%20\pi}%20=%20-1)
