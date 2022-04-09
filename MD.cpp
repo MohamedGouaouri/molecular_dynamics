@@ -381,8 +381,6 @@ void initialize()
     p = 0;
     //  initialize positions
 
-    // TODO: Paralallize this loop
-
     for (i = 0; i < n; i++)
     {
         for (j = 0; j < n; j++)
@@ -447,6 +445,7 @@ double Kinetic()
     double v2, kin;
 
     kin = 0.;
+
     for (int i = 0; i < N; i++)
     {
 
@@ -470,6 +469,7 @@ double Potential()
     int i, j, k;
 
     Pot = 0.;
+
     for (i = 0; i < N; i++)
     {
         for (j = 0; j < N; j++)
@@ -511,6 +511,7 @@ void computeAccelerations()
             a[i][k] = 0;
         }
     }
+
     for (i = 0; i < N - 1; i++)
     { // loop over all distinct pairs i,j
         for (j = i + 1; j < N; j++)
@@ -607,6 +608,8 @@ void initializeVelocities()
 
     int i, j;
 
+    // TODO: Parallalize this  loop
+
     for (i = 0; i < N; i++)
     {
 
@@ -620,6 +623,8 @@ void initializeVelocities()
     // Vcm = sum_i^N  m*v_i/  sum_i^N  M
     // Compute center-of-mas velocity according to the formula above
     double vCM[3] = {0, 0, 0};
+
+    // TODO: Parallalize this  loop
 
     for (i = 0; i < N; i++)
     {
@@ -637,6 +642,9 @@ void initializeVelocities()
     //  velocity of each particle... effectively set the
     //  center of mass velocity to zero so that the system does
     //  not drift in space!
+
+    // TODO: Parallalize this  loop
+
     for (i = 0; i < N; i++)
     {
         for (j = 0; j < 3; j++)
@@ -650,6 +658,9 @@ void initializeVelocities()
     //  by a factor which is consistent with our initial temperature, Tinit
     double vSqdSum, lambda;
     vSqdSum = 0.;
+
+    // TODO: Parallalize this  loop
+
     for (i = 0; i < N; i++)
     {
         for (j = 0; j < 3; j++)
@@ -660,6 +671,8 @@ void initializeVelocities()
     }
 
     lambda = sqrt(3 * (N - 1) * Tinit / vSqdSum);
+
+    // TODO: Parallalize this  loop
 
     for (i = 0; i < N; i++)
     {
