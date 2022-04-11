@@ -1,5 +1,5 @@
-LIB        = -L. 
-INCLUDE    = -I.
+LIB        = -L. -pthread
+INCLUDE    = -I. pthreads/routines.c
 CFLAGS     = -O3
 EXEC       = MD
 BUILD_PATH = build
