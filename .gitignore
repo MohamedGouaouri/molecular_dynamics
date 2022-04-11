@@ -33,3 +33,5 @@
 build/*
 *.txt
 *.xyz
+.vscode/*
+.idea/*
