@@ -1,4 +1,4 @@
-LIB        = -L. 
+LIB        = -L. -pthread 
 INCLUDE    = -I.
 CFLAGS     = -O3
 EXEC       = MD
