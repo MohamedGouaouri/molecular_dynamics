@@ -30,8 +30,9 @@
 *.exe
 *.out
 *.app
+
 .vscode/*
 .idea/*
 *.txt
-buid/*
 *.xyz
+buid/*
