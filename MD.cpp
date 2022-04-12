@@ -28,6 +28,17 @@
 #include <math.h>
 #include <string.h>
 
+// To monitor time taken by functions
+#include <time.h>
+clock_t start, end;
+double cpu_time_used;
+
+// Our dear threads
+#include <pthread.h>
+#define NUMTHREADS 8
+pthread_t threads[NUMTHREADS];
+pthread_attr_t attr;
+
 // Number of particles
 int N;
 
@@ -495,22 +506,66 @@ double Potential()
     return Pot;
 }
 
+
+
 //   Uses the derivative of the Lennard-Jones potential to calculate
 //   the forces on each atom.  Then uses a = F/m to calculate the
 //   accelleration of each atom.
-void computeAccelerations()
-{
-    int i, j, k;
-    double f, rSqd;
-    double rij[3]; // position of i relative to j
 
-    for (i = 0; i < N; i++)
-    { // set all accelerations to zero
-        for (k = 0; k < 3; k++)
+struct MD_nullifyAccsTask {
+    int start;
+    int end;
+};
+
+void *nullifyAccsRoutine(void *arg)  {
+
+    struct MD_nullifyAccsTask* mytask = (struct MD_nullifyAccsTask*) arg;
+
+    for( int i = mytask->start; i <= mytask->end; i++ ) {
+        for ( int k = 0; k < 3; k++ )
         {
             a[i][k] = 0;
         }
     }
+
+    pthread_exit(NULL);
+
+}
+
+void computeAccelerations()
+{
+
+    start = clock();
+
+    int i, j, k;
+    double f, rSqd;
+    double rij[3]; // position of i relative to j
+
+    struct MD_nullifyAccsTask* nullifyAccsTasks[NUMTHREADS];
+
+    for(int i=0; i<NUMTHREADS; i++) {
+
+        nullifyAccsTasks[i] = (struct MD_nullifyAccsTask*)malloc(sizeof(struct MD_nullifyAccsTask*));
+        nullifyAccsTasks[i]->start = i*N/NUMTHREADS;
+        nullifyAccsTasks[i]->end = (i+1) * N/NUMTHREADS;
+
+        pthread_create(&threads[i], NULL, nullifyAccsRoutine, nullifyAccsTasks[i]);
+
+        pthread_join(threads[i], NULL);
+        
+    }
+
+    for(int i=0; i<NUMTHREADS; i++) {
+        free(nullifyAccsTasks[i]);
+    }
+
+    // for (i = 0; i < N; i++)
+    // { // set all accelerations to zero
+    //     for (k = 0; k < 3; k++)
+    //     {
+    //         a[i][k] = 0;
+    //     }
+    // }
 
     for (i = 0; i < N - 1; i++)
     { // loop over all distinct pairs i,j
@@ -537,7 +592,14 @@ void computeAccelerations()
             }
         }
     }
+
+    end = clock();
+    cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
+
+    printf("\ncomputeAccelerations() took %f seconds to execute\n", cpu_time_used);
 }
+
+
 
 // returns sum of dv/dt*m/A (aka Pressure) from elastic collisions with walls
 double VelocityVerlet(double dt, int iter, FILE *fp)
