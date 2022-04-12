@@ -20,10 +20,10 @@ extern double L;
 void *updatePositionRoutine(void *arg)
 {
     struct MD_VelocityVerlet_task *t = (struct MD_VelocityVerlet_task *)arg;
-    int i = t->start;
+
     int n = t->end;
     double dt = t->dt;
-    for (i = 0; i < n; i++)
+    for (int i = t->start; i < n; i++)
     {
         for (int j = 0; j < 3; j++)
         {
@@ -39,10 +39,10 @@ void *updatePositionRoutine(void *arg)
 void *updateVelocitiesRoutine(void *arg)
 {
     struct MD_VelocityVerlet_task *t = (struct MD_VelocityVerlet_task *)arg;
-    int i = t->start;
+
     int n = t->end;
     double dt = t->dt;
-    for (i = 0; i < n; i++)
+    for (int i = t->start; i < n; i++)
     {
         for (int j = 0; j < 3; j++)
         {
@@ -55,11 +55,10 @@ void *updateVelocitiesRoutine(void *arg)
 void *elasticWallsRoutine(void *arg)
 {
     struct MD_VelocityVerlet_task *t = (struct MD_VelocityVerlet_task *)arg;
-    int i = t->start;
     int n = t->end;
     double dt = t->dt;
     double psum;
-    for (i = 0; i < n; i++)
+    for (int i = t->start; i < n; i++)
     {
         for (int j = 0; j < 3; j++)
         {
