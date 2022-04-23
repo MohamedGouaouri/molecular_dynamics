@@ -532,6 +532,60 @@ void *nullifyAccsRoutine(void *arg)  {
 
 }
 
+struct MD_calcNewAccsTask {
+    int start1;
+    int end1;
+    int start2;
+    int end2;
+} data;
+
+void *calcNewAccsRoutine(void *arg) {
+
+    struct MD_calcNewAccsTask* myTask = (struct MD_calcNewAccsTask *) arg;
+    int startMarks[] = { myTask->start1 , myTask->start2 };
+    int endMarks[] = { myTask->end1, myTask->end2 };
+    int nbiter = 2;
+
+    int i, j, k;
+    double f, rSqd;
+    double rij[3]; // position of i relative to j
+
+
+    for (size_t iter = 0; iter < nbiter-1; iter++)
+    {
+        
+        for (i = startMarks[iter]; i < endMarks[iter]; i++)
+        {
+            // loop over all distinct pairs i,j
+            for (j = i + 1; j < N; j++)
+            {
+                // initialize r^2 to zero
+                rSqd = 0;
+
+                for (k = 0; k < 3; k++)
+                {
+                    //  component-by-componenent position of i relative to j
+                    rij[k] = r[i][k] - r[j][k];
+                    //  sum of squares of the components
+                    rSqd += rij[k] * rij[k];
+                }
+
+                //  From derivative of Lennard-Jones with sigma and epsilon set equal to 1 in natural units!
+                f = 24 * (2 * pow(rSqd, -7) - pow(rSqd, -4));
+                for (k = 0; k < 3; k++)
+                {
+                    //  from F = ma, where m = 1 in natural units!
+                    a[i][k] += rij[k] * f;
+                    a[j][k] -= rij[k] * f;
+                }
+            }
+        }
+    }
+
+    pthread_exit(NULL);
+
+}
+
 void computeAccelerations()
 {
 
@@ -543,7 +597,8 @@ void computeAccelerations()
 
     struct MD_nullifyAccsTask* nullifyAccsTasks[NUMTHREADS];
 
-    for(int i=0; i<NUMTHREADS; i++) {
+    for(int i=0; i<NUMTHREADS; i++) 
+    {
 
         nullifyAccsTasks[i] = (struct MD_nullifyAccsTask*)malloc(sizeof(struct MD_nullifyAccsTask*));
         nullifyAccsTasks[i]->start = i*N/NUMTHREADS;
@@ -559,6 +614,34 @@ void computeAccelerations()
         free(nullifyAccsTasks[i]);
     }
 
+    struct MD_calcNewAccsTask* calcNewAccsTasks[NUMTHREADS];
+
+    for (int i = 0; i < NUMTHREADS; i++)
+    {
+
+        calcNewAccsTasks[i] = (struct MD_calcNewAccsTask*)malloc(sizeof(struct MD_calcNewAccsTask*));
+
+        calcNewAccsTasks[i]->start1 = i * (N-1)/(2*NUMTHREADS);
+        calcNewAccsTasks[i]->end1 = (i+1) * (N-1)/(2*NUMTHREADS);
+
+        if(i==0) calcNewAccsTasks[i]->end2 = (N-1);
+        else calcNewAccsTasks[i]->end2 = calcNewAccsTasks[i-1]->start2;
+
+        if( i<N%NUMTHREADS ) calcNewAccsTasks[i]->start2 = calcNewAccsTasks[i]->end2 - (N-1)/(2*NUMTHREADS) - 1;
+        else if( i==NUMTHREADS-1 ) calcNewAccsTasks[i]->start2 = calcNewAccsTasks[i]->end1;
+        else calcNewAccsTasks[i]->start2 = calcNewAccsTasks[i]->end2 - (N-1)/(2*NUMTHREADS) - ((N-1)/NUMTHREADS)%2;
+
+
+        pthread_create(&threads[i], NULL, calcNewAccsRoutine, calcNewAccsTasks[i]);
+
+        pthread_join(threads[i], NULL);
+    }
+
+    for(int i=0; i<NUMTHREADS; i++) {
+        free(calcNewAccsTasks[i]);
+    }
+    
+    
     // for (i = 0; i < N; i++)
     // { // set all accelerations to zero
     //     for (k = 0; k < 3; k++)
@@ -567,31 +650,31 @@ void computeAccelerations()
     //     }
     // }
 
-    for (i = 0; i < N - 1; i++)
-    { // loop over all distinct pairs i,j
-        for (j = i + 1; j < N; j++)
-        {
-            // initialize r^2 to zero
-            rSqd = 0;
+    // for (i = 0; i < N - 1; i++)
+    // { // loop over all distinct pairs i,j
+    //     for (j = i + 1; j < N; j++)
+    //     {
+    //         // initialize r^2 to zero
+    //         rSqd = 0;
 
-            for (k = 0; k < 3; k++)
-            {
-                //  component-by-componenent position of i relative to j
-                rij[k] = r[i][k] - r[j][k];
-                //  sum of squares of the components
-                rSqd += rij[k] * rij[k];
-            }
+    //         for (k = 0; k < 3; k++)
+    //         {
+    //             //  component-by-componenent position of i relative to j
+    //             rij[k] = r[i][k] - r[j][k];
+    //             //  sum of squares of the components
+    //             rSqd += rij[k] * rij[k];
+    //         }
 
-            //  From derivative of Lennard-Jones with sigma and epsilon set equal to 1 in natural units!
-            f = 24 * (2 * pow(rSqd, -7) - pow(rSqd, -4));
-            for (k = 0; k < 3; k++)
-            {
-                //  from F = ma, where m = 1 in natural units!
-                a[i][k] += rij[k] * f;
-                a[j][k] -= rij[k] * f;
-            }
-        }
-    }
+    //         //  From derivative of Lennard-Jones with sigma and epsilon set equal to 1 in natural units!
+    //         f = 24 * (2 * pow(rSqd, -7) - pow(rSqd, -4));
+    //         for (k = 0; k < 3; k++)
+    //         {
+    //             //  from F = ma, where m = 1 in natural units!
+    //             a[i][k] += rij[k] * f;
+    //             a[j][k] -= rij[k] * f;
+    //         }
+    //     }
+    // }
 
     end = clock();
     cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
