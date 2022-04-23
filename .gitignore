@@ -31,7 +31,9 @@
 *.out
 *.app
 build/*
+
 *.txt
+*.xyz
 *.xyz
 .vscode/*
 .idea/*

@@ -27,12 +27,18 @@
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
-
 #include "pthreads/routines.h"
 
-#define NUMTHREADS 8
+// To monitor time taken by functions
+#include <time.h>
+clock_t start, end;
+double cpu_time_used;
 
+// Our dear threads
+#include <pthread.h>
+#define NUMTHREADS 8
 pthread_t threads[NUMTHREADS];
+pthread_attr_t attr;
 
 // Number of particles
 int N;
@@ -504,45 +510,181 @@ double Potential()
 //   Uses the derivative of the Lennard-Jones potential to calculate
 //   the forces on each atom.  Then uses a = F/m to calculate the
 //   accelleration of each atom.
-void computeAccelerations()
-{
-    int i, j, k;
-    double f, rSqd;
-    double rij[3]; // position of i relative to j
 
-    for (i = 0; i < N; i++)
-    { // set all accelerations to zero
-        for (k = 0; k < 3; k++)
+struct MD_nullifyAccsTask
+{
+    int start;
+    int end;
+};
+
+void *nullifyAccsRoutine(void *arg)
+{
+
+    struct MD_nullifyAccsTask *mytask = (struct MD_nullifyAccsTask *)arg;
+
+    for (int i = mytask->start; i <= mytask->end; i++)
+    {
+        for (int k = 0; k < 3; k++)
         {
             a[i][k] = 0;
         }
     }
 
-    for (i = 0; i < N - 1; i++)
-    { // loop over all distinct pairs i,j
-        for (j = i + 1; j < N; j++)
+    pthread_exit(NULL);
+}
+
+struct MD_calcNewAccsTask
+{
+    int start1;
+    int end1;
+    int start2;
+    int end2;
+} data;
+
+void *calcNewAccsRoutine(void *arg)
+{
+
+    struct MD_calcNewAccsTask *myTask = (struct MD_calcNewAccsTask *)arg;
+    int startMarks[] = {myTask->start1, myTask->start2};
+    int endMarks[] = {myTask->end1, myTask->end2};
+    int nbiter = 2;
+
+    int i, j, k;
+    double f, rSqd;
+    double rij[3]; // position of i relative to j
+
+    for (size_t iter = 0; iter < nbiter - 1; iter++)
+    {
+
+        for (i = startMarks[iter]; i < endMarks[iter]; i++)
         {
-            // initialize r^2 to zero
-            rSqd = 0;
-
-            for (k = 0; k < 3; k++)
+            // loop over all distinct pairs i,j
+            for (j = i + 1; j < N; j++)
             {
-                //  component-by-componenent position of i relative to j
-                rij[k] = r[i][k] - r[j][k];
-                //  sum of squares of the components
-                rSqd += rij[k] * rij[k];
-            }
+                // initialize r^2 to zero
+                rSqd = 0;
 
-            //  From derivative of Lennard-Jones with sigma and epsilon set equal to 1 in natural units!
-            f = 24 * (2 * pow(rSqd, -7) - pow(rSqd, -4));
-            for (k = 0; k < 3; k++)
-            {
-                //  from F = ma, where m = 1 in natural units!
-                a[i][k] += rij[k] * f;
-                a[j][k] -= rij[k] * f;
+                for (k = 0; k < 3; k++)
+                {
+                    //  component-by-componenent position of i relative to j
+                    rij[k] = r[i][k] - r[j][k];
+                    //  sum of squares of the components
+                    rSqd += rij[k] * rij[k];
+                }
+
+                //  From derivative of Lennard-Jones with sigma and epsilon set equal to 1 in natural units!
+                f = 24 * (2 * pow(rSqd, -7) - pow(rSqd, -4));
+                for (k = 0; k < 3; k++)
+                {
+                    //  from F = ma, where m = 1 in natural units!
+                    a[i][k] += rij[k] * f;
+                    a[j][k] -= rij[k] * f;
+                }
             }
         }
     }
+
+    pthread_exit(NULL);
+}
+
+void computeAccelerations()
+{
+
+    start = clock();
+
+    int i, j, k;
+    double f, rSqd;
+    double rij[3]; // position of i relative to j
+
+    struct MD_nullifyAccsTask *nullifyAccsTasks[NUMTHREADS];
+
+    for (int i = 0; i < NUMTHREADS; i++)
+    {
+
+        nullifyAccsTasks[i] = (struct MD_nullifyAccsTask *)malloc(sizeof(struct MD_nullifyAccsTask *));
+        nullifyAccsTasks[i]->start = i * N / NUMTHREADS;
+        nullifyAccsTasks[i]->end = (i + 1) * N / NUMTHREADS;
+
+        pthread_create(&threads[i], NULL, nullifyAccsRoutine, nullifyAccsTasks[i]);
+
+        pthread_join(threads[i], NULL);
+    }
+
+    for (int i = 0; i < NUMTHREADS; i++)
+    {
+        free(nullifyAccsTasks[i]);
+    }
+
+    struct MD_calcNewAccsTask *calcNewAccsTasks[NUMTHREADS];
+
+    for (int i = 0; i < NUMTHREADS; i++)
+    {
+
+        calcNewAccsTasks[i] = (struct MD_calcNewAccsTask *)malloc(sizeof(struct MD_calcNewAccsTask *));
+
+        calcNewAccsTasks[i]->start1 = i * (N - 1) / (2 * NUMTHREADS);
+        calcNewAccsTasks[i]->end1 = (i + 1) * (N - 1) / (2 * NUMTHREADS);
+
+        if (i == 0)
+            calcNewAccsTasks[i]->end2 = (N - 1);
+        else
+            calcNewAccsTasks[i]->end2 = calcNewAccsTasks[i - 1]->start2;
+
+        if (i < N % NUMTHREADS)
+            calcNewAccsTasks[i]->start2 = calcNewAccsTasks[i]->end2 - (N - 1) / (2 * NUMTHREADS) - 1;
+        else if (i == NUMTHREADS - 1)
+            calcNewAccsTasks[i]->start2 = calcNewAccsTasks[i]->end1;
+        else
+            calcNewAccsTasks[i]->start2 = calcNewAccsTasks[i]->end2 - (N - 1) / (2 * NUMTHREADS) - ((N - 1) / NUMTHREADS) % 2;
+
+        pthread_create(&threads[i], NULL, calcNewAccsRoutine, calcNewAccsTasks[i]);
+
+        pthread_join(threads[i], NULL);
+    }
+
+    for (int i = 0; i < NUMTHREADS; i++)
+    {
+        free(calcNewAccsTasks[i]);
+    }
+
+    // for (i = 0; i < N; i++)
+    // { // set all accelerations to zero
+    //     for (k = 0; k < 3; k++)
+    //     {
+    //         a[i][k] = 0;
+    //     }
+    // }
+
+    // for (i = 0; i < N - 1; i++)
+    // { // loop over all distinct pairs i,j
+    //     for (j = i + 1; j < N; j++)
+    //     {
+    //         // initialize r^2 to zero
+    //         rSqd = 0;
+
+    //         for (k = 0; k < 3; k++)
+    //         {
+    //             //  component-by-componenent position of i relative to j
+    //             rij[k] = r[i][k] - r[j][k];
+    //             //  sum of squares of the components
+    //             rSqd += rij[k] * rij[k];
+    //         }
+
+    //         //  From derivative of Lennard-Jones with sigma and epsilon set equal to 1 in natural units!
+    //         f = 24 * (2 * pow(rSqd, -7) - pow(rSqd, -4));
+    //         for (k = 0; k < 3; k++)
+    //         {
+    //             //  from F = ma, where m = 1 in natural units!
+    //             a[i][k] += rij[k] * f;
+    //             a[j][k] -= rij[k] * f;
+    //         }
+    //     }
+    // }
+
+    end = clock();
+    cpu_time_used = ((double)(end - start)) / CLOCKS_PER_SEC;
+
+    printf("\ncomputeAccelerations() took %f seconds to execute\n", cpu_time_used);
 }
 
 // returns sum of dv/dt*m/A (aka Pressure) from elastic collisions with walls

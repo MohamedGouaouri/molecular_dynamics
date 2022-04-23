@@ -1,4 +1,4 @@
-LIB        = -L. -pthread
+LIB        = -L. -pthread -Wno-unused-result
 INCLUDE    = -I. pthreads/routines.c
 CFLAGS     = -O3
 EXEC       = MD
