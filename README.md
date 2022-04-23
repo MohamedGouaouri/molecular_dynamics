@@ -3,6 +3,7 @@ Parallization of an existing molecular dynamics simulation program using Pthread
 
 # Build instructions
 To build the project, run the following commands
+
 ```bash
 mkdir build
 make MD
