@@ -1,5 +1,5 @@
 LIB        = -L. -pthread -Wno-unused-result
-INCLUDE    = -I.
+INCLUDE    = -I. pthreads/routines.c
 CFLAGS     = -O3
 EXEC       = MD
 BUILD_PATH = build
