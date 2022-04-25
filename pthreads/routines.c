@@ -76,3 +76,24 @@ void *elasticWallsRoutine(void *arg)
     }
     pthread_exit(NULL);
 }
+
+// kinetic
+void *calculatePartialKinetic(void *arg){
+    struct MD_Kinetic_task *t = (struct MD_Kinetic_task  *)arg;
+    double v2, partialKin;
+
+    partialKin = 0.;
+
+    for (int i = t->start; i < t->end; i++)
+    {
+
+        v2 = 0.;
+        for (int j = 0; j < 3; j++)
+        {
+
+            v2 += t->velocity[i][j] * t->velocity[i][j];
+        }
+        partialKin += t->m * v2 / 2.;
+    }
+    pthread_exit(partialKin);
+}

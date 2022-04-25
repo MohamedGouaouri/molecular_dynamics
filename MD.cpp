@@ -454,24 +454,33 @@ double MeanSquaredVelocity()
 double Kinetic()
 { // Write Function here!
 
-    double v2, kin;
+    double globalKin = 0;
 
-    kin = 0.;
-
-    for (int i = 0; i < N; i++)
+    struct MD_Kinetic_task *tasks[NUMTHREADS];
+    for (size_t i = 0; i < NUMTHREADS; i++)
     {
-
-        v2 = 0.;
-        for (int j = 0; j < 3; j++)
-        {
-
-            v2 += v[i][j] * v[i][j];
+        /* code */
+        tasks[i] = (struct MD_Kinetic_task *)malloc(sizeof(struct MD_Kinetic_task));
+        tasks[i]->start = i * N / NUMTHREADS;
+        tasks[i]->end = (i + 1) * N / NUMTHREADS;
+        tasks[i]->velocity=v;
+        tasks[i]->m=m;
+        pthread_create(&threads[i], NULL, calculatePartialKinetic, (void *)tasks[i]);
+        if(rc != 0){
+            printf("ERROR , pour le pthread %d", i);
+            exit(-1);
         }
-        kin += m * v2 / 2.;
+    }
+
+    for(size_t i = 0; i < NUMTHREADS; i++){
+        void* partialKin;
+        pthread_join(tid[i], &partialKin);
+        globalKin += (double) partialKin;
     }
 
     // printf("  Total Kinetic Energy is %f\n",N*mvs*m/2.);
-    return kin;
+    return globalKin;
+
 }
 
 // Function to calculate the potential energy of the system
