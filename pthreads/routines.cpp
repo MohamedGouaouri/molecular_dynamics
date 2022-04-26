@@ -3,7 +3,6 @@
 #include <math.h>
 #include "routines.h"
 
-const int MAXPART = 5001;
 
 extern double r[MAXPART][3];
 //  Velocity
@@ -81,7 +80,7 @@ void *elasticWallsRoutine(void *arg)
 void *calculatePartialKinetic(void *arg){
     struct MD_Kinetic_task *t = (struct MD_Kinetic_task  *)arg;
     double v2, partialKin;
-
+//    printf("START = %d , END = %d",t->start , t->end );
     partialKin = 0.;
 
     for (int i = t->start; i < t->end; i++)
@@ -90,10 +89,13 @@ void *calculatePartialKinetic(void *arg){
         v2 = 0.;
         for (int j = 0; j < 3; j++)
         {
+            printf("Velocity[%d][%d] = %f \n" , i , j ,  *t->velocity[i][j]  ) ;
+//            v2 += t->velocity[i][j] * t->velocity[i][j];
+            printf("V2 =%f" , v2 );
 
-            v2 += t->velocity[i][j] * t->velocity[i][j];
         }
         partialKin += t->m * v2 / 2.;
     }
-    pthread_exit(partialKin);
+//    printf("PartialKin = %f", partialKin);
+    pthread_exit(&partialKin);
 }
