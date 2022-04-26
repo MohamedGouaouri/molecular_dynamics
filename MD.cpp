@@ -465,19 +465,18 @@ double Kinetic()
         tasks[i]->end = (i + 1) * N / NUMTHREADS;
         tasks[i]->m = m;
         pthread_create(&threads[i], NULL, calculatePartialKinetic, (void *)tasks[i]);
-        //        if(rc != 0){
-        //            printf("ERROR , pour le pthread %d", i);
-        //            exit(-1);
-        //        }
     }
 
-    //    for(int i = 0; i < NUMTHREADS; i++){
-    //        void* partialKin;
-    //        pthread_join(threads[i], &partialKin);
-    //        globalKin += reinterpret_cast<double &>( partialKin);
-    //    }
+    for (int i = 0; i < NUMTHREADS; i++)
+    {
+        void *partialKin;
+        pthread_join(threads[i], &partialKin);
+        globalKin += reinterpret_cast<double &>(partialKin);
+        free(tasks[i]);
+    }
 
     // printf("  Total Kinetic Energy is %f\n",N*mvs*m/2.);
+
     return globalKin;
 }
 
@@ -690,8 +689,6 @@ void computeAccelerations()
 
     end = clock();
     cpu_time_used = ((double)(end - start)) / CLOCKS_PER_SEC;
-
-    printf("\ncomputeAccelerations() took %f seconds to execute\n", cpu_time_used);
 }
 
 // returns sum of dv/dt*m/A (aka Pressure) from elastic collisions with walls
