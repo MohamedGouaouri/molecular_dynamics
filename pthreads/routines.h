@@ -12,11 +12,11 @@ struct MD_VelocityVerlet_task
     double computation;
 };
 
-struct MD_Kinetic_task{
-    int start ;
-    int end ;
+struct MD_Kinetic_task
+{
+    int start;
+    int end;
     double m;
-    double(* velocity)[MAXPART][3];
 };
 
 void *updatePositionRoutine(void *arg);

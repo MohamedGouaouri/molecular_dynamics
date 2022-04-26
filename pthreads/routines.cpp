@@ -3,7 +3,6 @@
 #include <math.h>
 #include "routines.h"
 
-
 extern double r[MAXPART][3];
 //  Velocity
 extern double v[MAXPART][3];
@@ -77,31 +76,20 @@ void *elasticWallsRoutine(void *arg)
 }
 
 // kinetic
-void *calculatePartialKinetic(void *arg){
-    struct MD_Kinetic_task *t = (struct MD_Kinetic_task  *)arg;
+void *calculatePartialKinetic(void *arg)
+{
+    struct MD_Kinetic_task *t = (struct MD_Kinetic_task *)arg;
     double v2, partialKin;
-    printf("START = %d , END = %d \n",t->start , t->end );
     partialKin = 0.;
-    printf("*t->velocity[10][0] =\n");
-    printf("%f\n",*t->velocity[10][0] );
-    printf("*t->velocity[135][0] =\n");
-    printf("%f\n",*t->velocity[135][0] );
     for (int i = t->start; i < t->end; i++)
     {
 
         v2 = 0.;
         for (int j = 0; j < 3; j++)
         {
-
-
-            printf("i = %d , j=%d \n", i , j);
-            printf("Velocity[%d][%d] = %f \n" , i , j ,  *t->velocity[i][j]  ) ;
-            v2 += *t->velocity[i][j] * *t->velocity[i][j];
-            printf("V2 =%f" , v2 );
-
+            v2 += v[i][j] * v[i][j];
         }
         partialKin += t->m * v2 / 2.;
     }
-//    printf("PartialKin = %f", partialKin);
     pthread_exit(&partialKin);
 }

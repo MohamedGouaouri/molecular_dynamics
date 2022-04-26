@@ -59,7 +59,7 @@ double L;
 double Tinit; // 2;
 //  Vectors!
 //
-//const int MAXPART = 5001;
+// const int MAXPART = 5001;
 //  Position
 double r[MAXPART][3];
 //  Velocity
@@ -463,24 +463,22 @@ double Kinetic()
         tasks[i] = (struct MD_Kinetic_task *)malloc(sizeof(struct MD_Kinetic_task));
         tasks[i]->start = i * N / NUMTHREADS;
         tasks[i]->end = (i + 1) * N / NUMTHREADS;
-        tasks[i]->velocity=&v;
-        tasks[i]->m=m;
+        tasks[i]->m = m;
         pthread_create(&threads[i], NULL, calculatePartialKinetic, (void *)tasks[i]);
-//        if(rc != 0){
-//            printf("ERROR , pour le pthread %d", i);
-//            exit(-1);
-//        }
+        //        if(rc != 0){
+        //            printf("ERROR , pour le pthread %d", i);
+        //            exit(-1);
+        //        }
     }
 
-//    for(int i = 0; i < NUMTHREADS; i++){
-//        void* partialKin;
-//        pthread_join(threads[i], &partialKin);
-//        globalKin += reinterpret_cast<double &>( partialKin);
-//    }
+    //    for(int i = 0; i < NUMTHREADS; i++){
+    //        void* partialKin;
+    //        pthread_join(threads[i], &partialKin);
+    //        globalKin += reinterpret_cast<double &>( partialKin);
+    //    }
 
     // printf("  Total Kinetic Energy is %f\n",N*mvs*m/2.);
     return globalKin;
-
 }
 
 // Function to calculate the potential energy of the system
