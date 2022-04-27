@@ -3,8 +3,6 @@
 #include <math.h>
 #include "routines.h"
 
-const int MAXPART = 5001;
-
 extern double r[MAXPART][3];
 //  Velocity
 extern double v[MAXPART][3];
@@ -143,4 +141,23 @@ void *calcNewAccsRoutine(void *arg)
     }
 
     pthread_exit(NULL);
+}
+
+// kinetic
+void *calculatePartialKinetic(void *arg)
+{
+    struct MD_Kinetic_task *t = (struct MD_Kinetic_task *)arg;
+    double v2, partialKin;
+    partialKin = 0.;
+    for (int i = t->start; i < t->end; i++)
+    {
+
+        v2 = 0.;
+        for (int j = 0; j < 3; j++)
+        {
+            v2 += v[i][j] * v[i][j];
+        }
+        partialKin += t->m * v2 / 2.;
+    }
+    pthread_exit(&partialKin);
 }

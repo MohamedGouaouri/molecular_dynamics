@@ -61,7 +61,7 @@ double L;
 double Tinit; // 2;
 //  Vectors!
 //
-const int MAXPART = 5001;
+// const int MAXPART = 5001;
 //  Position
 extern double r[MAXPART][3];
 //  Velocity
@@ -456,24 +456,30 @@ double MeanSquaredVelocity()
 double Kinetic()
 { // Write Function here!
 
-    double v2, kin;
+    double globalKin = 0;
 
-    kin = 0.;
-
-    for (int i = 0; i < N; i++)
+    struct MD_Kinetic_task *tasks[NUMTHREADS];
+    for (int i = 0; i < NUMTHREADS; i++)
     {
+        /* code */
+        tasks[i] = (struct MD_Kinetic_task *)malloc(sizeof(struct MD_Kinetic_task));
+        tasks[i]->start = i * N / NUMTHREADS;
+        tasks[i]->end = (i + 1) * N / NUMTHREADS;
+        tasks[i]->m = m;
+        pthread_create(&threads[i], NULL, calculatePartialKinetic, (void *)tasks[i]);
+    }
 
-        v2 = 0.;
-        for (int j = 0; j < 3; j++)
-        {
-
-            v2 += v[i][j] * v[i][j];
-        }
-        kin += m * v2 / 2.;
+    for (int i = 0; i < NUMTHREADS; i++)
+    {
+        void *partialKin;
+        pthread_join(threads[i], &partialKin);
+        globalKin += reinterpret_cast<double &>(partialKin);
+        free(tasks[i]);
     }
 
     // printf("  Total Kinetic Energy is %f\n",N*mvs*m/2.);
-    return kin;
+
+    return globalKin;
 }
 
 // Function to calculate the potential energy of the system
@@ -575,8 +581,6 @@ void computeAccelerations()
 
     end = clock();
     cpu_time_used = ((double)(end - start)) / CLOCKS_PER_SEC;
-
-    printf("\ncomputeAccelerations() took %f seconds to execute\n", cpu_time_used);
 }
 
 // returns sum of dv/dt*m/A (aka Pressure) from elastic collisions with walls
