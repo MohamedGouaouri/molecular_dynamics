@@ -27,6 +27,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
+#include <time.h>
 
 // Number of particles
 int N;
@@ -90,6 +91,9 @@ int main()
     double KE, PE, mvs, gc, Z;
     char trash[10000], prefix[1000], tfn[1000], ofn[1000], afn[1000];
     FILE *infp, *tfp, *ofp, *afp;
+
+    int prev = (int)time(NULL);
+    int now = 0;
 
     printf("\n  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
     printf("                  WELCOME TO WILLY P CHEM MD!\n");
@@ -280,7 +284,7 @@ int main()
     Tavg = 0;
 
     int tenp = floor(NumTime / 10);
-    fprintf(ofp, "  time (s)              T(t) (K)              P(t) (Pa)           Kinetic En. (n.u.)     Potential En. (n.u.) Total En. (n.u.)\n");
+    fprintf(ofp, "timestamp,time (s),T(t) (K),P(t) (Pa),Kinetic En. (n.u.),Potential En. (n.u.),Total En. (n.u.)\n");
     printf("  PERCENTAGE OF CALCULATION COMPLETE:\n  [");
     for (i = 0; i < NumTime + 1; i++)
     {
@@ -335,7 +339,13 @@ int main()
         Tavg += Temp;
         Pavg += Press;
 
-        fprintf(ofp, "  %8.4e  %20.8f  %20.8f %20.8f  %20.8f  %20.8f \n", i * dt * timefac, Temp, Press, KE, PE, KE + PE);
+        now = (int)time(NULL);
+        if (prev != now)
+        {
+            /* code */
+            fprintf(ofp, "%d, %.4e, %.8f, %.8f, %.8f, %.8f, %.8f\n", now, i * dt * timefac, Temp, Press, KE, PE, KE + PE);
+            prev = now;
+        }
     }
 
     // Because we have calculated the instantaneous temperature and pressure,
@@ -542,6 +552,7 @@ void computeAccelerations()
 // returns sum of dv/dt*m/A (aka Pressure) from elastic collisions with walls
 double VelocityVerlet(double dt, int iter, FILE *fp)
 {
+    clock_t start = clock();
     int i, j, k;
 
     double psum = 0.;
@@ -598,9 +609,24 @@ double VelocityVerlet(double dt, int iter, FILE *fp)
         }
         fprintf(fp, "\n");
     }
+
+    clock_t end = clock();
+    double cpu_time_used = ((double)(end - start)) / CLOCKS_PER_SEC;
+
+    // printf("velocityVerlet() took %f seconds to execute\n", cpu_time_used);
+    // char command[255];
+    // for (size_t i = 0; i < 255; i++)
+    // {
+    //     command[i] = '\0';
+    // }
+
+    // sprintf(command, "paho_c_pub -t %s --connection 127.0.0.1:1883 -m %f 2>/dev/null", "velocity", cpu_time_used * 1000000);
+    // system(command);
+    // printf(command);
     // fprintf(fp,"\n \n");
 
-    return psum / (6 * L * L);
+    return psum /
+           (6 * L * L);
 }
 
 void initializeVelocities()
