@@ -35,5 +35,8 @@ build/*
 *.txt
 *.xyz
 *.xyz
-.vscode/*
-.idea/*
+.vscode/
+.idea/
+__pycache__/
+build/
+*.csv
