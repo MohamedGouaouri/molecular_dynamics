@@ -27,7 +27,12 @@
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
+#include <pthread.h>
 #include <time.h>
+#include "pthreads/initVeloFun.h"
+#define NUMTHREADS 4
+pthread_t threads[NUMTHREADS];
+
 
 // Number of particles
 int N;
@@ -71,7 +76,6 @@ double VelocityVerlet(double dt, int iter, FILE *fp);
 //  solve F = ma for use in Velocity Verlet
 void computeAccelerations();
 //  Numerical Recipes function for generation gaussian distribution
-double gaussdist();
 //  Initialize velocities according to user-supplied initial Temperature (Tinit)
 void initializeVelocities();
 //  Compute total potential energy from particle coordinates
@@ -91,9 +95,6 @@ int main()
     double KE, PE, mvs, gc, Z;
     char trash[10000], prefix[1000], tfn[1000], ofn[1000], afn[1000];
     FILE *infp, *tfp, *ofp, *afp;
-
-    int prev = (int)time(NULL);
-    int now = 0;
 
     printf("\n  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
     printf("                  WELCOME TO WILLY P CHEM MD!\n");
@@ -268,6 +269,7 @@ int main()
 
     //  Put all the atoms in simple crystal lattice and give them random velocities
     //  that corresponds to the initial temperature we have specified
+    printf("initialize");
     initialize();
 
     //  Based on their positions, calculate the ininial intermolecular forces
@@ -284,7 +286,7 @@ int main()
     Tavg = 0;
 
     int tenp = floor(NumTime / 10);
-    fprintf(ofp, "timestamp,time (s),T(t) (K),P(t) (Pa),Kinetic En. (n.u.),Potential En. (n.u.),Total En. (n.u.)\n");
+    fprintf(ofp, "  time (s)              T(t) (K)              P(t) (Pa)           Kinetic En. (n.u.)     Potential En. (n.u.) Total En. (n.u.)\n");
     printf("  PERCENTAGE OF CALCULATION COMPLETE:\n  [");
     for (i = 0; i < NumTime + 1; i++)
     {
@@ -339,13 +341,7 @@ int main()
         Tavg += Temp;
         Pavg += Press;
 
-        now = (int)time(NULL);
-        if (prev != now)
-        {
-            /* code */
-            fprintf(ofp, "%d, %.4e, %.8f, %.8f, %.8f, %.8f, %.8f\n", now, i * dt * timefac, Temp, Press, KE, PE, KE + PE);
-            prev = now;
-        }
+        fprintf(ofp, "  %8.4e  %20.8f  %20.8f %20.8f  %20.8f  %20.8f \n", i * dt * timefac, Temp, Press, KE, PE, KE + PE);
     }
 
     // Because we have calculated the instantaneous temperature and pressure,
@@ -552,7 +548,6 @@ void computeAccelerations()
 // returns sum of dv/dt*m/A (aka Pressure) from elastic collisions with walls
 double VelocityVerlet(double dt, int iter, FILE *fp)
 {
-    clock_t start = clock();
     int i, j, k;
 
     double psum = 0.;
@@ -609,41 +604,25 @@ double VelocityVerlet(double dt, int iter, FILE *fp)
         }
         fprintf(fp, "\n");
     }
-
-    clock_t end = clock();
-    double cpu_time_used = ((double)(end - start)) / CLOCKS_PER_SEC;
-
-    // printf("velocityVerlet() took %f seconds to execute\n", cpu_time_used);
-    // char command[255];
-    // for (size_t i = 0; i < 255; i++)
-    // {
-    //     command[i] = '\0';
-    // }
-
-    // sprintf(command, "paho_c_pub -t %s --connection 127.0.0.1:1883 -m %f 2>/dev/null", "velocity", cpu_time_used * 1000000);
-    // system(command);
-    // printf(command);
     // fprintf(fp,"\n \n");
 
-    return psum /
-           (6 * L * L);
+    return psum / (6 * L * L);
 }
 
 void initializeVelocities()
 {
 
     int i, j;
-
+    clock_t start, end;
+    start = clock();
     // TODO: Parallalize this  loop
-
-    for (i = 0; i < N; i++)
-    {
-
-        for (j = 0; j < 3; j++)
-        {
-            //  Pull a number from a Gaussian Distribution
-            v[i][j] = gaussdist();
-        }
+    struct MD_initVelocities_task *veloTasks[NUMTHREADS];
+    for(size_t i=0;i<NUMTHREADS;i++){
+        veloTasks[i] = (struct MD_initVelocities_task*) malloc(sizeof(struct  MD_initVelocities_task));
+        veloTasks[i] ->start_index = (N/NUMTHREADS) * i;
+        veloTasks[i] ->stop_index = (N/NUMTHREADS) * (i+1);
+        pthread_create(&threads[i], NULL, initGaussMat, (void *)veloTasks[i]);
+        pthread_join(threads[i], NULL);
     }
 
     // Vcm = sum_i^N  m*v_i/  sum_i^N  M
@@ -651,16 +630,10 @@ void initializeVelocities()
     double vCM[3] = {0, 0, 0};
 
     // TODO: Parallalize this  loop
-
-    for (i = 0; i < N; i++)
-    {
-        for (j = 0; j < 3; j++)
-        {
-
-            vCM[j] += m * v[i][j];
-        }
+    for(size_t i=0;i<NUMTHREADS;i++){
+        pthread_create(&threads[i], NULL, masCenterInit, (void *)veloTasks[i]);
+        pthread_join(threads[i], NULL);
     }
-
     for (i = 0; i < 3; i++)
         vCM[i] /= N * m;
 
@@ -671,13 +644,9 @@ void initializeVelocities()
 
     // TODO: Parallalize this  loop
 
-    for (i = 0; i < N; i++)
-    {
-        for (j = 0; j < 3; j++)
-        {
-
-            v[i][j] -= vCM[j];
-        }
+    for(size_t i=0;i<NUMTHREADS;i++){
+        pthread_create(&threads[i], NULL, nullifyCenter, (void *)veloTasks[i]);
+        pthread_join(threads[i], NULL);
     }
 
     //  Now we want to scale the average velocity of the system
@@ -687,54 +656,20 @@ void initializeVelocities()
 
     // TODO: Parallalize this  loop
 
-    for (i = 0; i < N; i++)
-    {
-        for (j = 0; j < 3; j++)
-        {
-
-            vSqdSum += v[i][j] * v[i][j];
-        }
+    for(size_t i=0;i<NUMTHREADS;i++){
+        pthread_create(&threads[i], NULL, scaleAvgVeloc, (void *)veloTasks[i]);
+        pthread_join(threads[i], NULL);
     }
 
     lambda = sqrt(3 * (N - 1) * Tinit / vSqdSum);
 
     // TODO: Parallalize this  loop
 
-    for (i = 0; i < N; i++)
-    {
-        for (j = 0; j < 3; j++)
-        {
-
-            v[i][j] *= lambda;
-        }
+    for(size_t i=0;i<NUMTHREADS;i++){
+        pthread_create(&threads[i], NULL, lambdaProduct, (void *)veloTasks[i]);
+        pthread_join(threads[i], NULL);
     }
-}
-
-//  Numerical recipes Gaussian distribution number generator
-double gaussdist()
-{
-    static bool available = false;
-    static double gset;
-    double fac, rsq, v1, v2;
-    if (!available)
-    {
-        do
-        {
-            v1 = 2.0 * rand() / double(RAND_MAX) - 1.0;
-            v2 = 2.0 * rand() / double(RAND_MAX) - 1.0;
-            rsq = v1 * v1 + v2 * v2;
-        } while (rsq >= 1.0 || rsq == 0.0);
-
-        fac = sqrt(-2.0 * log(rsq) / rsq);
-        gset = v1 * fac;
-        available = true;
-
-        return v2 * fac;
-    }
-    else
-    {
-
-        available = false;
-        return gset;
-    }
+    end = clock();
+    double total_time = ((double) (end - start)) / CLOCKS_PER_SEC;
+    printf("\ninitializeVelocities took %f seconds to execute\n", total_time);
 }
