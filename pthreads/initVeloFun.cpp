@@ -7,6 +7,7 @@ extern double v[MAXPART][3];
 extern double vCM[3];
 extern double vSqdSum;
 extern double lambda;
+extern double m;
 
 //  Numerical recipes Gaussian distribution number generator
 double gaussdist()

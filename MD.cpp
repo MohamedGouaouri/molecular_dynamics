@@ -609,6 +609,13 @@ double VelocityVerlet(double dt, int iter, FILE *fp)
     return psum / (6 * L * L);
 }
 
+// Vcm = sum_i^N  m*v_i/  sum_i^N  M
+    // Compute center-of-mas velocity according to the formula above
+    double vCM[3] = {0, 0, 0};
+
+    double vSqdSum;
+    double lambda;
+
 void initializeVelocities()
 {
 
@@ -624,10 +631,6 @@ void initializeVelocities()
         pthread_create(&threads[i], NULL, initGaussMat, (void *)veloTasks[i]);
         pthread_join(threads[i], NULL);
     }
-
-    // Vcm = sum_i^N  m*v_i/  sum_i^N  M
-    // Compute center-of-mas velocity according to the formula above
-    double vCM[3] = {0, 0, 0};
 
     // TODO: Parallalize this  loop
     for(size_t i=0;i<NUMTHREADS;i++){
@@ -651,7 +654,7 @@ void initializeVelocities()
 
     //  Now we want to scale the average velocity of the system
     //  by a factor which is consistent with our initial temperature, Tinit
-    double vSqdSum, lambda;
+    /*Lambda and vSqdSum*/
     vSqdSum = 0.;
 
     // TODO: Parallalize this  loop
