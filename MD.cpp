@@ -340,12 +340,13 @@ int main()
         Pavg += Press;
 
         now = (int)time(NULL);
-        if (prev != now)
-        {
-            /* code */
-            fprintf(ofp, "%d, %.4e, %.8f, %.8f, %.8f, %.8f, %.8f\n", now, i * dt * timefac, Temp, Press, KE, PE, KE + PE);
-            prev = now;
-        }
+        // if (prev != now)
+        // {
+        //     /* code */
+        //     fprintf(ofp, "%d, %.4e, %.8f, %.8f, %.8f, %.8f, %.8f\n", now, i * dt * timefac, Temp, Press, KE, PE, KE + PE);
+        //     prev = now;
+        // }
+        fprintf(ofp, "%d, %.4e, %.8f, %.8f, %.8f, %.8f, %.8f\n", now, i * dt * timefac, Temp, Press, KE, PE, KE + PE);
     }
 
     // Because we have calculated the instantaneous temperature and pressure,
