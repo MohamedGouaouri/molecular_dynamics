@@ -297,7 +297,7 @@ int main()
     Tavg = 0;
 
     int tenp = floor(NumTime / 10);
-    fprintf(ofp, "  time (s)              T(t) (K)              P(t) (Pa)           Kinetic En. (n.u.)     Potential En. (n.u.) Total En. (n.u.)\n");
+    fprintf(ofp, "timestamp,time (s),T(t) (K),P(t) (Pa),Kinetic En. (n.u.),Potential En. (n.u.),Total En. (n.u.)\n");
     printf("  PERCENTAGE OF CALCULATION COMPLETE:\n  [");
 
     clock_t start_simulation_time = clock();
@@ -363,7 +363,7 @@ int main()
             printf("Execution time of 1 iteration is %f\n", cpu_time_used);
             reported = 1;
         }
-        // fprintf(ofp, "  %8.4e  %20.8f  %20.8f %20.8f  %20.8f  %20.8f \n", i * dt * timefac, Temp, Press, KE, PE, KE + PE);
+        fprintf(ofp, "%f, %.4e, %.8f, %.8f, %.8f, %.8f, %.8f \n", time(NULL), i * dt * timefac, Temp, Press, KE, PE, KE + PE);
     }
 
     clock_t end_simulation_time = clock();
