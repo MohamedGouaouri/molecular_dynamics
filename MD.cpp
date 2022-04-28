@@ -299,6 +299,9 @@ int main()
     int tenp = floor(NumTime / 10);
     fprintf(ofp, "  time (s)              T(t) (K)              P(t) (Pa)           Kinetic En. (n.u.)     Potential En. (n.u.) Total En. (n.u.)\n");
     printf("  PERCENTAGE OF CALCULATION COMPLETE:\n  [");
+
+    clock_t start_simulation_time = clock();
+    int reported = 0;
     for (i = 0; i < NumTime + 1; i++)
     {
 
@@ -328,6 +331,7 @@ int main()
         // This updates the positions and velocities using Newton's Laws
         // Also computes the Pressure as the sum of momentum changes from wall collisions / timestep
         // which is a Kinetic Theory of gasses concept of Pressure
+        start = clock();
         Press = VelocityVerlet(dt, i + 1, tfp);
         Press *= PressFac;
 
@@ -351,10 +355,20 @@ int main()
 
         Tavg += Temp;
         Pavg += Press;
+        end = clock();
 
-        fprintf(ofp, "  %8.4e  %20.8f  %20.8f %20.8f  %20.8f  %20.8f \n", i * dt * timefac, Temp, Press, KE, PE, KE + PE);
+        cpu_time_used = (double)(end - start) / CLOCKS_PER_SEC;
+        if (!reported)
+        {
+            printf("Execution time of 1 iteration is %f\n", cpu_time_used);
+            reported = 1;
+        }
+        // fprintf(ofp, "  %8.4e  %20.8f  %20.8f %20.8f  %20.8f  %20.8f \n", i * dt * timefac, Temp, Press, KE, PE, KE + PE);
     }
 
+    clock_t end_simulation_time = clock();
+    cpu_time_used = (double)(end_simulation_time - start_simulation_time) / CLOCKS_PER_SEC;
+    printf("Execution time the simulation is %f\n", cpu_time_used);
     // Because we have calculated the instantaneous temperature and pressure,
     // we can take the average over the whole simulation here
     Pavg /= NumTime;
@@ -397,39 +411,52 @@ void initialize()
 
     // parallelizing
 
-    struct MD_Init_task *initFun[NUMTHREADS];
+    // struct MD_Init_task *initFun[NUMTHREADS];
+    // int max = NUMTHREADS;
+    // if (n < NUMTHREADS)
+    // {
+    //     max = n;
+    // }
 
-    for (int i = 0; i < NUMTHREADS; i++)
-    {
-        initFun[i] = (struct MD_Init_task *)malloc(sizeof(struct MD_Init_task *));
-        initFun[i]->begin = i * n / NUMTHREADS;
-        initFun[i]->end = (i + 1) * n / NUMTHREADS;
+    // for (int i = 0; i < max; i++)
+    // {
+    //     initFun[i] = (struct MD_Init_task *)malloc(sizeof(struct MD_Init_task *));
+    //     initFun[i]->begin = i * n / max;
+    //     initFun[i]->end = (i + 1) * n / max;
+    //     printf("n = %d, i = %d, end = %d\n", n, i, initFun[i]->end);
+    //     pthread_create(&threads[i], NULL, ToDoInit, initFun[i]);
+    // }
 
-        pthread_create(&threads[i], NULL, ToDoInit, initFun[i]);
-        pthread_join(threads[i], NULL);
-    }
+    // for (int i = 0; i < max; i++)
+    // {
+    //     pthread_join(threads[i], NULL);
+    //     free(initFun[i]);
+    // }
 
-    end = clock();
-    cpu_time_used = ((double)(end - end)) / CLOCKS_PER_SEC;
+    // end = clock();
+    // cpu_time_used = ((double)(end - end)) / CLOCKS_PER_SEC;
     // printf("\nInitialize function took %f seconds to execute.\n\n", total_time);
 
-    //    for (i = 0; i < n; i++)
-    //    {
-    //        for (j = 0; j < n; j++)
-    //        {
-    //           for (k = 0; k < n; k++)
-    //            {
-    //                if (p < N)
-    //                {
-    //
-    //                    r[p][0] = (i + 0.5) * pos;
-    //                    r[p][1] = (j + 0.5) * pos;
-    //                    r[p][2] = (k + 0.5) * pos;
-    //                }
-    //                p++;
-    //            }
-    //        }
-    //    }
+    int p = 0;
+    double pos = L / n;
+
+    for (int i = 0; i < n; i++)
+    {
+        for (int j = 0; j < n; j++)
+        {
+            for (int k = 0; k < n; k++)
+            {
+                if (p < N)
+                {
+
+                    r[p][0] = (i + 0.5) * pos;
+                    r[p][1] = (j + 0.5) * pos;
+                    r[p][2] = (k + 0.5) * pos;
+                }
+                p++;
+            }
+        }
+    }
 
     // Call function to initialize velocities
     initializeVelocities();
@@ -556,12 +583,11 @@ void computeAccelerations()
         nullifyAccsTasks[i]->end = (i + 1) * N / NUMTHREADS;
 
         pthread_create(&threads[i], NULL, nullifyAccsRoutine, nullifyAccsTasks[i]);
-
-        pthread_join(threads[i], NULL);
     }
 
     for (int i = 0; i < NUMTHREADS; i++)
     {
+        pthread_join(threads[i], NULL);
         free(nullifyAccsTasks[i]);
     }
 
@@ -588,12 +614,11 @@ void computeAccelerations()
             calcNewAccsTasks[i]->start2 = calcNewAccsTasks[i]->end2 - (N - 1) / (2 * NUMTHREADS) - ((N - 1) / NUMTHREADS) % 2;
 
         pthread_create(&threads[i], NULL, calcNewAccsRoutine, calcNewAccsTasks[i]);
-
-        pthread_join(threads[i], NULL);
     }
 
     for (int i = 0; i < NUMTHREADS; i++)
     {
+        pthread_join(threads[i], NULL);
         free(calcNewAccsTasks[i]);
     }
 
@@ -631,6 +656,10 @@ double VelocityVerlet(double dt, int iter, FILE *fp)
         tasks[iter]->start = iter * N / NUMTHREADS;
         tasks[iter]->end = (iter + 1) * N / NUMTHREADS;
         pthread_create(&threads[iter], NULL, updatePositionRoutine, (void *)tasks[iter]);
+    }
+    for (size_t iter = 0; iter < NUMTHREADS; iter++)
+    {
+
         pthread_join(threads[iter], NULL);
     }
 
@@ -648,6 +677,11 @@ double VelocityVerlet(double dt, int iter, FILE *fp)
         pthread_join(threads[iter], NULL);
     }
 
+    for (size_t iter = 0; iter < NUMTHREADS; iter++)
+    {
+        pthread_join(threads[iter], NULL);
+    }
+
     // Elastic walls
     for (size_t iter = 0; iter < NUMTHREADS; iter++)
     {
@@ -658,6 +692,12 @@ double VelocityVerlet(double dt, int iter, FILE *fp)
         pthread_create(&threads[iter], NULL, elasticWallsRoutine, (void *)tasks[iter]);
         pthread_join(threads[iter], NULL);
     }
+
+    for (size_t iter = 0; iter < NUMTHREADS; iter++)
+    {
+        pthread_join(threads[iter], NULL);
+    }
+
     for (size_t i = 0; i < NUMTHREADS; i++)
     {
         psum += tasks[i]->computation;
@@ -703,15 +743,24 @@ void initializeVelocities()
         veloTasks[i]->start_index = (N / NUMTHREADS) * i;
         veloTasks[i]->stop_index = (N / NUMTHREADS) * (i + 1);
         pthread_create(&threads[i], NULL, initGaussMat, (void *)veloTasks[i]);
-        pthread_join(threads[i], NULL);
+    }
+
+    for (size_t iter = 0; iter < NUMTHREADS; iter++)
+    {
+        pthread_join(threads[iter], NULL);
     }
 
     // TODO: Parallalize this  loop
     for (size_t i = 0; i < NUMTHREADS; i++)
     {
         pthread_create(&threads[i], NULL, masCenterInit, (void *)veloTasks[i]);
-        pthread_join(threads[i], NULL);
     }
+
+    for (size_t iter = 0; iter < NUMTHREADS; iter++)
+    {
+        pthread_join(threads[iter], NULL);
+    }
+
     for (i = 0; i < 3; i++)
         vCM[i] /= N * m;
 
@@ -725,7 +774,11 @@ void initializeVelocities()
     for (size_t i = 0; i < NUMTHREADS; i++)
     {
         pthread_create(&threads[i], NULL, nullifyCenter, (void *)veloTasks[i]);
-        pthread_join(threads[i], NULL);
+    }
+
+    for (size_t iter = 0; iter < NUMTHREADS; iter++)
+    {
+        pthread_join(threads[iter], NULL);
     }
 
     //  Now we want to scale the average velocity of the system
@@ -738,7 +791,11 @@ void initializeVelocities()
     for (size_t i = 0; i < NUMTHREADS; i++)
     {
         pthread_create(&threads[i], NULL, scaleAvgVeloc, (void *)veloTasks[i]);
-        pthread_join(threads[i], NULL);
+    }
+
+    for (size_t iter = 0; iter < NUMTHREADS; iter++)
+    {
+        pthread_join(threads[iter], NULL);
     }
 
     lambda = sqrt(3 * (N - 1) * Tinit / vSqdSum);
@@ -748,8 +805,13 @@ void initializeVelocities()
     for (size_t i = 0; i < NUMTHREADS; i++)
     {
         pthread_create(&threads[i], NULL, lambdaProduct, (void *)veloTasks[i]);
-        pthread_join(threads[i], NULL);
     }
+
+    for (size_t iter = 0; iter < NUMTHREADS; iter++)
+    {
+        pthread_join(threads[iter], NULL);
+    }
+
     end = clock();
     double total_time = ((double)(end - start)) / CLOCKS_PER_SEC;
     // printf("\ninitializeVelocities took %f seconds to execute\n", total_time);

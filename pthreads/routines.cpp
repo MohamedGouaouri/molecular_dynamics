@@ -34,20 +34,20 @@ void *ToDoInit(void *arg)
     pos = L / n;
 
     //  index for number of particles assigned positions
-    p = 0;
+    // p = 0;
 
     struct MD_Init_task *initFun = (struct MD_Init_task *)arg;
 
-    for (i = initFun->begin; i <= initFun->end; i++)
+    for (i = initFun->begin; i < initFun->end; i++)
     {
 
-        for (j = initFun->begin; j <= initFun->end; j++)
+        for (j = initFun->begin; j < initFun->end; j++)
         {
 
-            for (k = initFun->begin; k <= initFun->end; k++)
+            for (k = initFun->begin; k < initFun->end; k++)
             {
 
-                if (p < N)
+                if (p < pow(initFun->end - initFun->begin, 3))
                 {
                     r[p][0] = (i + 0.5) * pos;
                     r[p][1] = (j + 0.5) * pos;
@@ -57,6 +57,9 @@ void *ToDoInit(void *arg)
             }
         }
     }
+
+    // printf("Thread (%ld) Begin task = %d, End task = %d\n", pthread_self(), initFun->begin, initFun->end);
+
     pthread_exit(NULL);
 }
 
@@ -155,6 +158,9 @@ void *updatePositionRoutine(void *arg)
         }
         // printf("  %i  %6.4e   %6.4e   %6.4e\n",i,r[i][0],r[i][1],r[i][2]);
     }
+
+    // printf("Thread (%ld) Begin task = %d, End task %d\n", pthread_self(), t->start, t->end);
+
     pthread_exit(NULL);
 }
 
@@ -217,6 +223,7 @@ void *nullifyAccsRoutine(void *arg)
             a[i][k] = 0;
         }
     }
+    // printf("Thread (%ld) Begin task = %d, End task %d\n", pthread_self(), mytask->start, mytask->end);
 
     pthread_exit(NULL);
 }
@@ -283,5 +290,8 @@ void *calculatePartialKinetic(void *arg)
         }
         partialKin += t->m * v2 / 2.;
     }
+
+    // printf("Thread (%ld) Begin task = %d, End task = %d\n", pthread_self(), t->start, t->end);
+
     pthread_exit(&partialKin);
 }
