@@ -28,6 +28,23 @@
 #include <math.h>
 #include <string.h>
 
+#include <time.h>
+#include <pthread.h>
+
+#define NUMTHREADS 8
+
+p_thread_t threads[NUMTHREADS];
+
+
+clock_t begin, end;
+double total_time;
+
+struct Init_fun{
+	int begin;
+	int end;
+};
+
+
 // Number of particles
 int N;
 
@@ -197,6 +214,7 @@ int main()
     printf("  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
     printf("\n\n  ENTER THE INTIAL TEMPERATURE OF YOUR GAS IN KELVIN\n");
     scanf("%lf", &Tinit);
+
     // Make sure temperature is a positive number!
     if (Tinit < 0.)
     {
@@ -366,38 +384,85 @@ int main()
     return 0;
 }
 
-void initialize()
-{
+void *ToDoInit(void *arg){
+
     int n, p, i, j, k;
     double pos;
 
-    // Number of atoms in each direction
-    n = int(ceil(pow(N, 1.0 / 3)));
-
     //  spacing between atoms along a given direction
+    n = int(ceil(pow(N, 1.0 / 3)));
     pos = L / n;
 
     //  index for number of particles assigned positions
     p = 0;
+
+    struct Init_fun *initFun=(struct Init_fun *) arg;
+
+    for (i = initFun->begin ;i<=initFun->end; i++){
+
+    	for (j = initFun->begin; j<=initFun->end; j++){
+
+            for (k = initFun->begin; k <=initFun->end; k++){
+
+	            if (p < N){
+			r[p][0] = (i + 0.5) * pos;
+	                r[p][1] = (j + 0.5) * pos;
+	                r[p][2] = (k + 0.5) * pos;
+	            }
+	        p++;
+
+	    }
+	}
+
+    }
+}
+
+void initialize()
+{
+    int n;
+
+    // Number of atoms in each direction
+    n = int(ceil(pow(N, 1.0 / 3)));
+
     //  initialize positions
 
-    for (i = 0; i < n; i++)
-    {
-        for (j = 0; j < n; j++)
-        {
-            for (k = 0; k < n; k++)
-            {
-                if (p < N)
-                {
+    // time start
+    begin=clock();
 
-                    r[p][0] = (i + 0.5) * pos;
-                    r[p][1] = (j + 0.5) * pos;
-                    r[p][2] = (k + 0.5) * pos;
-                }
-                p++;
-            }
-        }
-    }
+    // parallelizing
+
+    struct Init_fun *initFun[NUMTHREADS];
+
+	for (int i=0; i<NUMTHREADS;i++){
+	    initFun[i]=(struct Init_fun *)malloc(sizeof(struct Init_fun *));
+	    initFun[i]->begin= i*n/NUMTHREADS;
+	    initFun[i]->end= (i+1)*n/NUMTHREADS;
+
+	    pthread_create(&threads[i],NULL,ToDoInit,initFun[i]);
+	    pthread_join(threads[i],NULL);
+	}
+
+	end= clock();
+	total_time= ((double)(end-begin))/CLOCKS_PER_SEC;
+	printf("\nInitialize function took %f seconds to execute.\n\n", total_time);
+
+//    for (i = 0; i < n; i++)
+//    {
+//        for (j = 0; j < n; j++)
+//        {
+//           for (k = 0; k < n; k++)
+//            {
+//                if (p < N)
+//                {
+//
+//                    r[p][0] = (i + 0.5) * pos;
+//                    r[p][1] = (j + 0.5) * pos;
+//                    r[p][2] = (k + 0.5) * pos;
+//                }
+//                p++;
+//            }
+//        }
+//    }
 
     // Call function to initialize velocities
     initializeVelocities();
