@@ -6,7 +6,7 @@ BUILD_PATH = build
 CXX        = g++
 
 ${EXEC}: MD.cpp
-	${CXX} ${CFLAGS} ${INCLUDE} ${LIB} MD.cpp -o ${BUILD_PATH}/${EXEC}
+	${CXX} ${CFLAGS} ${INCLUDE} ${LIB} MD.cpp -o ${BUILD_PATH}/${EXEC} -Wno-unused-result
 
 clean:
 	rm -f *.o

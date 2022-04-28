@@ -2,7 +2,20 @@
 #define H_PTHREAD_ROUTINES
 
 #include <pthread.h>
+#include <math.h>
 #define MAXPART 5001
+
+struct MD_initVelocities_task
+{
+    int start_index;
+    int stop_index;
+};
+
+void *initGaussMat(void *arg);
+void *masCenterInit(void *arg);
+void *nullifyCenter(void *arg);
+void *scaleAvgVeloc(void *arg);
+void *lambdaProduct(void *arg);
 
 struct MD_VelocityVerlet_task
 {
