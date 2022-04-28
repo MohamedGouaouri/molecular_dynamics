@@ -3,6 +3,8 @@
 #include <math.h>
 #include "routines.h"
 
+extern int N;
+
 extern double r[MAXPART][3];
 //  Velocity
 extern double v[MAXPART][3];
@@ -55,6 +57,7 @@ void *ToDoInit(void *arg)
             }
         }
     }
+    pthread_exit(NULL);
 }
 
 // parallelize the first nested loop: initialization of v

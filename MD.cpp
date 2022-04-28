@@ -42,9 +42,6 @@ double cpu_time_used;
 pthread_t threads[NUMTHREADS];
 pthread_attr_t attr;
 
-clock_t begin, end;
-double total_time;
-
 // Number of particles
 int N;
 
@@ -396,7 +393,7 @@ void initialize()
     //  initialize positions
 
     // time start
-    begin = clock();
+    start = clock();
 
     // parallelizing
 
@@ -413,7 +410,7 @@ void initialize()
     }
 
     end = clock();
-    total_time = ((double)(end - begin)) / CLOCKS_PER_SEC;
+    cpu_time_used = ((double)(end - end)) / CLOCKS_PER_SEC;
     // printf("\nInitialize function took %f seconds to execute.\n\n", total_time);
 
     //    for (i = 0; i < n; i++)
