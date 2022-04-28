@@ -21,6 +21,42 @@ extern double lambda;
 
 extern double gaussdist();
 
+void *ToDoInit(void *arg)
+{
+
+    int n, p, i, j, k;
+    double pos;
+
+    //  spacing between atoms along a given direction
+    n = int(ceil(pow(N, 1.0 / 3)));
+    pos = L / n;
+
+    //  index for number of particles assigned positions
+    p = 0;
+
+    struct MD_Init_task *initFun = (struct MD_Init_task *)arg;
+
+    for (i = initFun->begin; i <= initFun->end; i++)
+    {
+
+        for (j = initFun->begin; j <= initFun->end; j++)
+        {
+
+            for (k = initFun->begin; k <= initFun->end; k++)
+            {
+
+                if (p < N)
+                {
+                    r[p][0] = (i + 0.5) * pos;
+                    r[p][1] = (j + 0.5) * pos;
+                    r[p][2] = (k + 0.5) * pos;
+                }
+                p++;
+            }
+        }
+    }
+}
+
 // parallelize the first nested loop: initialization of v
 void *initGaussMat(void *arg)
 {

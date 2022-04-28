@@ -27,20 +27,23 @@
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
-#include "pthreads/routines.h"
-
+#include <pthread.h>
+#include <time.h>
 #include "pthreads/routines.h"
 
 // To monitor time taken by functions
-#include <time.h>
+
 clock_t start, end;
 double cpu_time_used;
 
 // Our dear threads
-#include <pthread.h>
+
 #define NUMTHREADS 8
 pthread_t threads[NUMTHREADS];
 pthread_attr_t attr;
+
+clock_t begin, end;
+double total_time;
 
 // Number of particles
 int N;
@@ -212,6 +215,7 @@ int main()
     printf("  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
     printf("\n\n  ENTER THE INTIAL TEMPERATURE OF YOUR GAS IN KELVIN\n");
     scanf("%lf", &Tinit);
+
     // Make sure temperature is a positive number!
     if (Tinit < 0.)
     {
@@ -384,36 +388,51 @@ int main()
 
 void initialize()
 {
-    int n, p, i, j, k;
-    double pos;
+    int n;
 
     // Number of atoms in each direction
     n = int(ceil(pow(N, 1.0 / 3)));
 
-    //  spacing between atoms along a given direction
-    pos = L / n;
-
-    //  index for number of particles assigned positions
-    p = 0;
     //  initialize positions
 
-    for (i = 0; i < n; i++)
-    {
-        for (j = 0; j < n; j++)
-        {
-            for (k = 0; k < n; k++)
-            {
-                if (p < N)
-                {
+    // time start
+    begin = clock();
 
-                    r[p][0] = (i + 0.5) * pos;
-                    r[p][1] = (j + 0.5) * pos;
-                    r[p][2] = (k + 0.5) * pos;
-                }
-                p++;
-            }
-        }
+    // parallelizing
+
+    struct MD_Init_task *initFun[NUMTHREADS];
+
+    for (int i = 0; i < NUMTHREADS; i++)
+    {
+        initFun[i] = (struct MD_Init_task *)malloc(sizeof(struct MD_Init_task *));
+        initFun[i]->begin = i * n / NUMTHREADS;
+        initFun[i]->end = (i + 1) * n / NUMTHREADS;
+
+        pthread_create(&threads[i], NULL, ToDoInit, initFun[i]);
+        pthread_join(threads[i], NULL);
     }
+
+    end = clock();
+    total_time = ((double)(end - begin)) / CLOCKS_PER_SEC;
+    // printf("\nInitialize function took %f seconds to execute.\n\n", total_time);
+
+    //    for (i = 0; i < n; i++)
+    //    {
+    //        for (j = 0; j < n; j++)
+    //        {
+    //           for (k = 0; k < n; k++)
+    //            {
+    //                if (p < N)
+    //                {
+    //
+    //                    r[p][0] = (i + 0.5) * pos;
+    //                    r[p][1] = (j + 0.5) * pos;
+    //                    r[p][2] = (k + 0.5) * pos;
+    //                }
+    //                p++;
+    //            }
+    //        }
+    //    }
 
     // Call function to initialize velocities
     initializeVelocities();

@@ -5,6 +5,14 @@
 #include <math.h>
 #define MAXPART 5001
 
+struct MD_Init_task
+{
+    int begin;
+    int end;
+};
+
+void *ToDoInit(void *arg);
+
 struct MD_initVelocities_task
 {
     int start_index;
