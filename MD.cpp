@@ -286,6 +286,10 @@ int main()
     int tenp = floor(NumTime / 10);
     fprintf(ofp, "timestamp,time (s),T(t) (K),P(t) (Pa),Kinetic En. (n.u.),Potential En. (n.u.),Total En. (n.u.)\n");
     printf("  PERCENTAGE OF CALCULATION COMPLETE:\n  [");
+    clock_t start_simulation_time = clock();
+    clock_t start, end;
+    double cpu_time_used;
+    int reported = 0;
     for (i = 0; i < NumTime + 1; i++)
     {
 
@@ -315,6 +319,7 @@ int main()
         // This updates the positions and velocities using Newton's Laws
         // Also computes the Pressure as the sum of momentum changes from wall collisions / timestep
         // which is a Kinetic Theory of gasses concept of Pressure
+        start = clock();
         Press = VelocityVerlet(dt, i + 1, tfp);
         Press *= PressFac;
 
@@ -338,16 +343,20 @@ int main()
 
         Tavg += Temp;
         Pavg += Press;
+        end = clock();
 
-        now = (int)time(NULL);
-        // if (prev != now)
-        // {
-        //     /* code */
-        //     fprintf(ofp, "%d, %.4e, %.8f, %.8f, %.8f, %.8f, %.8f\n", now, i * dt * timefac, Temp, Press, KE, PE, KE + PE);
-        //     prev = now;
-        // }
-        fprintf(ofp, "%d, %.4e, %.8f, %.8f, %.8f, %.8f, %.8f\n", now, i * dt * timefac, Temp, Press, KE, PE, KE + PE);
+        cpu_time_used = (double)(end - start) / CLOCKS_PER_SEC;
+        if (!reported)
+        {
+            printf("Execution time of 1 iteration is %f\n", cpu_time_used);
+            reported = 1;
+        }
+        // fprintf(ofp, "  %8.4e  %20.8f  %20.8f %20.8f  %20.8f  %20.8f \n", i * dt * timefac, Temp, Press, KE, PE, KE + PE);
     }
+
+    clock_t end_simulation_time = clock();
+    cpu_time_used = (double)(end_simulation_time - start_simulation_time) / CLOCKS_PER_SEC;
+    printf("Execution time the simulation is %f\n", cpu_time_used);
 
     // Because we have calculated the instantaneous temperature and pressure,
     // we can take the average over the whole simulation here
