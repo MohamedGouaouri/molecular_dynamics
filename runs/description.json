@@ -1,0 +1,33 @@
+{
+    "simulation": "Molecular dynamics simulatio",
+    "version": "pthreads",
+    "runs": [
+        {
+            "name": "run1",
+            "maintainer": "Mohammed",
+            "configuration": {
+                "Gaz": "He",
+                "Number of particles": 1000,
+                "Temperature": 1500,
+                "Density": 2000
+            },
+            "results": {
+                "cpu_time (1 iteration)": 0.006421,
+                "cpu_time (simulation)": 461.916781,
+                "Dashboard URL (Local)": "http://localhost:3000/goto/N-e_djw7k?orgId=1",
+                "Dashboard URL (Public)": "https://snapshots.raintank.io/dashboard/snapshot/jkEYQou5kIKnsgTQj6Z7brY4pO9oUXLK"
+            }
+        },
+        {
+            "name": "run2",
+            "maintainer": "Mohammed",
+            "configuration": {
+                "Gaz": "He",
+                "Number of particles": 2000,
+                "Temperature": 1500,
+                "Density": 2000
+            },
+            "results": {}
+        }
+    ]
+}

@@ -8,3 +8,5 @@ To build the project, run the following commands
 mkdir build
 make MD
 ```
+# Run instructions
+
