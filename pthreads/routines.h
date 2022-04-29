@@ -33,6 +33,14 @@ struct MD_VelocityVerlet_task
     double computation;
 };
 
+struct MD_Potential_Task
+{
+    int start;
+    int end;
+    double Pot;
+};
+void *potentialRoutine(void *arg);
+
 struct MD_Kinetic_task
 {
     int start;

@@ -103,8 +103,8 @@ int main()
     double dt, Vol, Temp, Press, Pavg, Tavg, rho;
     double VolFac, TempFac, PressFac, timefac;
     double KE, PE, mvs, gc, Z;
-    char trash[10000], prefix[1000], tfn[1000], ofn[1000], afn[1000];
-    FILE *infp, *tfp, *ofp, *afp;
+    char trash[10000], prefix[1000], tfn[1000], ofn[1000], afn[1000], executionfn[1000];
+    FILE *infp, *tfp, *ofp, *afp, *executionfp;
 
     printf("\n  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
     printf("                  WELCOME TO WILLY P CHEM MD!\n");
@@ -117,6 +117,9 @@ int main()
     strcat(ofn, "_output.txt");
     strcpy(afn, prefix);
     strcat(afn, "_average.txt");
+
+    strcpy(executionfn, prefix);
+    strcat(executionfn, "_execution.txt");
 
     printf("\n  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
     printf("                  TITLE ENTERED AS '%s'\n", prefix);
@@ -260,7 +263,7 @@ int main()
     tfp = fopen(tfn, "w"); //  The MD trajectory, coordinates of every particle at each timestep
     ofp = fopen(ofn, "w"); //  Output of other quantities (T, P, gc, etc) at every timestep
     afp = fopen(afn, "w"); //  Average T, P, gc, etc from the simulation
-
+    executionfp = fopen(executionfn, "w");
     int NumTime;
     if (strcmp(atype, "He") == 0)
     {
@@ -297,10 +300,13 @@ int main()
     Tavg = 0;
 
     int tenp = floor(NumTime / 10);
-    fprintf(ofp, "timestamp,time (s),T(t) (K),P(t) (Pa),Kinetic En. (n.u.),Potential En. (n.u.),Total En. (n.u.)\n");
+    fprintf(ofp, "timestamp,cpu_time,time (s),T(t) (K),P(t) (Pa),Kinetic En. (n.u.),Potential En. (n.u.),Total En. (n.u.)\n");
     printf("  PERCENTAGE OF CALCULATION COMPLETE:\n  [");
 
     clock_t start_simulation_time = clock();
+    long prev = time(NULL);
+    long now;
+    prev = time(NULL);
     int reported = 0;
     for (i = 0; i < NumTime + 1; i++)
     {
@@ -363,7 +369,15 @@ int main()
             printf("Execution time of 1 iteration is %f\n", cpu_time_used);
             reported = 1;
         }
-        fprintf(ofp, "%f, %.4e, %.8f, %.8f, %.8f, %.8f, %.8f \n", time(NULL), i * dt * timefac, Temp, Press, KE, PE, KE + PE);
+        now = time(NULL);
+        if (prev != now)
+        {
+
+            fprintf(ofp, "%ld, %.4f, %.4e, %.8f, %.8f, %.8f, %.8f, %.8f \n", now, cpu_time_used * 1000000, i * dt * timefac, Temp, Press, KE, PE, KE + PE);
+
+            prev = now;
+        }
+        // printf("hi\n");
     }
 
     clock_t end_simulation_time = clock();
@@ -393,6 +407,7 @@ int main()
     fclose(tfp);
     fclose(ofp);
     fclose(afp);
+    fclose(executionfp);
 
     return 0;
 }
@@ -530,31 +545,36 @@ double Kinetic()
 // Function to calculate the potential energy of the system
 double Potential()
 {
-    double quot, r2, rnorm, term1, term2, Pot;
-    int i, j, k;
+    int i;
+    double Pot = 0.;
 
-    Pot = 0.;
+    struct MD_Potential_Task *tasks[NUMTHREADS];
 
-    for (i = 0; i < N; i++)
+    for (i = 0; i < NUMTHREADS; i++)
     {
-        for (j = 0; j < N; j++)
-        {
+        tasks[i] = (struct MD_Potential_Task *)malloc(sizeof(struct MD_Potential_Task));
+        tasks[i]->Pot = 0.0;
+    }
 
-            if (j != i)
-            {
-                r2 = 0.;
-                for (k = 0; k < 3; k++)
-                {
-                    r2 += (r[i][k] - r[j][k]) * (r[i][k] - r[j][k]);
-                }
-                rnorm = sqrt(r2);
-                quot = sigma / rnorm;
-                term1 = pow(quot, 12.);
-                term2 = pow(quot, 6.);
+    for (i = 0; i < NUMTHREADS; i++)
+    {
 
-                Pot += 4 * epsilon * (term1 - term2);
-            }
-        }
+        tasks[i]->start = i * N / NUMTHREADS;
+        tasks[i]->end = (i + 1) * N / NUMTHREADS;
+
+        pthread_create(&threads[i], NULL, potentialRoutine, (void *)tasks[i]);
+
+        pthread_join(threads[i], NULL);
+    }
+
+    for (i = 0; i < NUMTHREADS; i++)
+    {
+        Pot += tasks[i]->Pot;
+    }
+
+    for (i = 0; i < NUMTHREADS; i++)
+    {
+        free(tasks[i]);
     }
 
     return Pot;

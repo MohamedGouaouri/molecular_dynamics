@@ -32,7 +32,7 @@
 *.app
 build/*
 
-*.txt
+# *.txt
 *.xyz
 *.xyz
 .vscode/
