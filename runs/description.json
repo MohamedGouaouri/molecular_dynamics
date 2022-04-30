@@ -12,8 +12,8 @@
                 "Density": 2000
             },
             "results": {
-                "cpu_time (1 iteration)": 0,
-                "cpu_time (simulation)": 0,
+                "cpu_time (1 iteration)": 0.050243,
+                "cpu_time (simulation)": 2406.585363,
                 "Dashboard URL (Local)": "",
                 "Dashboard URL (Public)": ""
             }
