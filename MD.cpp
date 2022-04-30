@@ -215,7 +215,7 @@ int main()
     printf("  NUMBER DENSITY OF LIQUID ARGON AT 1 ATM AND 87 K IS ABOUT 35000 moles/m^3\n");
 
     scanf("%lf", &rho);
-    N = 216;
+    N = 500;
     Vol = N / (rho * NA);
 
     Vol /= VolFac;
