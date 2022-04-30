@@ -3,11 +3,11 @@
     "version": "pthreads",
     "runs": [
         {
-            "name": "run1",
+            "name": "run4",
             "maintainer": "Mohammed",
             "configuration": {
                 "Gaz": "He",
-                "Number of particles": 1000,
+                "Number of particles": 500,
                 "Temperature": 1500,
                 "Density": 2000
             },
@@ -19,11 +19,11 @@
             }
         },
         {
-            "name": "run2",
+            "name": "run5",
             "maintainer": "Mohammed",
             "configuration": {
                 "Gaz": "He",
-                "Number of particles": 2000,
+                "Number of particles": 700,
                 "Temperature": 1500,
                 "Density": 2000
             },
