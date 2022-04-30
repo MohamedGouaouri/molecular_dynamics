@@ -287,8 +287,10 @@ int main()
     fprintf(ofp, "timestamp,time (s),T(t) (K),P(t) (Pa),Kinetic En. (n.u.),Potential En. (n.u.),Total En. (n.u.)\n");
     printf("  PERCENTAGE OF CALCULATION COMPLETE:\n  [");
     clock_t start_simulation_time = clock();
-    clock_t start, end;
-    double cpu_time_used;
+    clock_t start, end, cpu_time_used;
+    long prev = time(NULL);
+    long now;
+    prev = time(NULL);
     int reported = 0;
     for (i = 0; i < NumTime + 1; i++)
     {
@@ -351,7 +353,15 @@ int main()
             printf("Execution time of 1 iteration is %f\n", cpu_time_used);
             reported = 1;
         }
-        // fprintf(ofp, "  %8.4e  %20.8f  %20.8f %20.8f  %20.8f  %20.8f \n", i * dt * timefac, Temp, Press, KE, PE, KE + PE);
+        now = time(NULL);
+        if (prev != now)
+        {
+
+            fprintf(ofp, "%ld, %.4f, %.4e, %.8f, %.8f, %.8f, %.8f, %.8f \n", now, cpu_time_used * 1000000, i * dt * timefac, Temp, Press, KE, PE, KE + PE);
+
+            prev = now;
+        }
+        // printf("hi\n");
     }
 
     clock_t end_simulation_time = clock();
