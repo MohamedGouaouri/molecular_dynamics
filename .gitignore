@@ -36,3 +36,5 @@ __pycache__/
 build/
 *.xyz
 *.csv
+runs/*.txt
+runs/*.xyz
