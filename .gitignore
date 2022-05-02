@@ -40,5 +40,7 @@ build/*
 __pycache__/
 build/
 *.csv
+runs/*.csv
 runs/*.txt
+runs/*.xyz
 cmake-build-debug/
