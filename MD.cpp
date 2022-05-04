@@ -215,7 +215,7 @@ int main()
     printf("  NUMBER DENSITY OF LIQUID ARGON AT 1 ATM AND 87 K IS ABOUT 35000 moles/m^3\n");
 
     scanf("%lf", &rho);
-    N = 216;
+    N = 100;
     Vol = N / (rho * NA);
 
     Vol /= VolFac;
@@ -286,9 +286,13 @@ int main()
     int tenp = floor(NumTime / 10);
     fprintf(ofp, "timestamp,time (s),T(t) (K),P(t) (Pa),Kinetic En. (n.u.),Potential En. (n.u.),Total En. (n.u.)\n");
     printf("  PERCENTAGE OF CALCULATION COMPLETE:\n  [");
+
+    clock_t start; clock_t start_simulation_time = clock();
+    int reported = 0;
+
     for (i = 0; i < NumTime + 1; i++)
     {
-
+        start = clock();
         //  This just prints updates on progress of the calculation for the users convenience
         if (i == tenp)
             printf(" 10 |");
@@ -339,6 +343,15 @@ int main()
         Tavg += Temp;
         Pavg += Press;
 
+        clock_t end = clock();
+
+        float cpu_time_used = (float)(end - start) / CLOCKS_PER_SEC;
+        if (!reported)
+        {
+            printf("Execution time of 1 iteration is %f\n", cpu_time_used);
+            reported = 1;
+        }
+
         now = (int)time(NULL);
         if (prev != now)
         {
@@ -368,6 +381,11 @@ int main()
     printf("\n  THE COMPRESSIBILITY (unitless):          %15.5f \n", Z);
     printf("\n  TOTAL VOLUME (m^3):                      %10.5e \n", Vol * VolFac);
     printf("\n  NUMBER OF PARTICLES (unitless):          %i \n", N);
+
+    
+    clock_t end_simulation_time = clock();
+    float cpu_time_used = (float)(end_simulation_time - start_simulation_time) / CLOCKS_PER_SEC;
+    printf("Execution time of the simulation is %f\n", cpu_time_used);
 
     fclose(tfp);
     fclose(ofp);
