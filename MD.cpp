@@ -29,6 +29,10 @@
 #include <string.h>
 #include <time.h>
 
+#include <omp.h>
+#include <time.h>
+int NUMTHREADS = 8;
+
 // Number of particles
 int N;
 
@@ -401,6 +405,9 @@ void initialize()
     int n, p, i, j, k;
     double pos;
 
+    clock_t start, end;
+    start = clock();
+
     // Number of atoms in each direction
     n = int(ceil(pow(N, 1.0 / 3)));
 
@@ -411,23 +418,29 @@ void initialize()
     p = 0;
     //  initialize positions
 
-    for (i = 0; i < n; i++)
-    {
-        for (j = 0; j < n; j++)
-        {
-            for (k = 0; k < n; k++)
-            {
-                if (p < N)
-                {
+    #pragma omp parallel for schedule(dynamic,N/NUMTHREADS) num_threads(NUMTHREADS)
 
-                    r[p][0] = (i + 0.5) * pos;
-                    r[p][1] = (j + 0.5) * pos;
-                    r[p][2] = (k + 0.5) * pos;
+        for (i = 0; i < n; i++)
+        {
+            for (j = 0; j < n; j++)
+            {
+                for (k = 0; k < n; k++)
+                {
+                    if (p < N)
+                    {
+
+                        r[p][0] = (i + 0.5) * pos;
+                        r[p][1] = (j + 0.5) * pos;
+                        r[p][2] = (k + 0.5) * pos;
+                    }
+                    p++;
                 }
-                p++;
             }
         }
-    }
+
+    end = clock();
+    double total_time = ((double) (end - start)) / CLOCKS_PER_SEC;
+    printf("\nInitialize took %f seconds to execute\n", total_time);
 
     // Call function to initialize velocities
     initializeVelocities();
