@@ -29,6 +29,9 @@
 #include <string.h>
 #include <time.h>
 
+clock_t start, end;
+double cpu_time_used;
+
 // Number of particles
 int N;
 
@@ -266,6 +269,8 @@ int main()
         NumTime = 20000;
     }
 
+    clock_t start_simulation_time = clock();
+
     //  Put all the atoms in simple crystal lattice and give them random velocities
     //  that corresponds to the initial temperature we have specified
     initialize();
@@ -283,6 +288,11 @@ int main()
     Pavg = 0;
     Tavg = 0;
 
+    long prev = time(NULL);
+    long now;
+    prev = time(NULL);
+    int reported =0;
+
     int tenp = floor(NumTime / 10);
     fprintf(ofp, "timestamp,time (s),T(t) (K),P(t) (Pa),Kinetic En. (n.u.),Potential En. (n.u.),Total En. (n.u.)\n");
     printf("  PERCENTAGE OF CALCULATION COMPLETE:\n  [");
@@ -294,7 +304,7 @@ int main()
     int reported = 0;
     for (i = 0; i < NumTime + 1; i++)
     {
-
+        start = clock();
         //  This just prints updates on progress of the calculation for the users convenience
         if (i == tenp)
             printf(" 10 |");
@@ -359,9 +369,26 @@ int main()
 
             fprintf(ofp, "%ld, %.4f, %.4e, %.8f, %.8f, %.8f, %.8f, %.8f \n", now, cpu_time_used * 1000000, i * dt * timefac, Temp, Press, KE, PE, KE + PE);
 
+        fprintf(ofp, "  %8.4e  %20.8f  %20.8f %20.8f  %20.8f  %20.8f \n", i * dt * timefac, Temp, Press, KE, PE, KE + PE);
+    
+        end = clock();
+
+        cpu_time_used = (double)(end - start) / CLOCKS_PER_SEC;
+        if (!reported)
+        {
+            printf("Execution time of 1 iteration is %f\n", cpu_time_used);
+            reported = 1;
+        }
+        now = time(NULL);
+        if (prev != now)
+        {
+
+            fprintf(ofp, "%ld, %.4f, %.4e, %.8f, %.8f, %.8f, %.8f, %.8f \n", now, cpu_time_used * 1000000, i * dt * timefac, Temp, Press, KE, PE, KE + PE);
+
             prev = now;
         }
-        // printf("hi\n");
+    
+        }
     }
 
     clock_t end_simulation_time = clock();
