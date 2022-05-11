@@ -27,6 +27,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
+#include <omp.h>
 #include <time.h>
 
 clock_t start, end;
@@ -34,6 +35,9 @@ double cpu_time_used;
 
 // Number of particles
 int N;
+
+// Number of threads
+#define NUM_THREADS 8 
 
 //  Lennard-Jones parameters in natural units!
 double sigma = 1.;
@@ -95,8 +99,6 @@ int main()
     char trash[10000], prefix[1000], tfn[1000], ofn[1000], afn[1000];
     FILE *infp, *tfp, *ofp, *afp;
 
-    int prev = (int)time(NULL);
-    int now = 0;
 
     printf("\n  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
     printf("                  WELCOME TO WILLY P CHEM MD!\n");
@@ -218,7 +220,7 @@ int main()
     printf("  NUMBER DENSITY OF LIQUID ARGON AT 1 ATM AND 87 K IS ABOUT 35000 moles/m^3\n");
 
     scanf("%lf", &rho);
-    N = 500;
+    N = 216;
     Vol = N / (rho * NA);
 
     Vol /= VolFac;
@@ -288,20 +290,16 @@ int main()
     Pavg = 0;
     Tavg = 0;
 
-    long prev = time(NULL);
-    long now;
-    prev = time(NULL);
-    int reported =0;
-
     int tenp = floor(NumTime / 10);
     fprintf(ofp, "timestamp,time (s),T(t) (K),P(t) (Pa),Kinetic En. (n.u.),Potential En. (n.u.),Total En. (n.u.)\n");
     printf("  PERCENTAGE OF CALCULATION COMPLETE:\n  [");
-    clock_t start_simulation_time = clock();
-    clock_t start, end, cpu_time_used;
+
+    clock_t start, end;
     long prev = time(NULL);
     long now;
     prev = time(NULL);
     int reported = 0;
+    
     for (i = 0; i < NumTime + 1; i++)
     {
         start = clock();
@@ -332,6 +330,7 @@ int main()
         // Also computes the Pressure as the sum of momentum changes from wall collisions / timestep
         // which is a Kinetic Theory of gasses concept of Pressure
         start = clock();
+
         Press = VelocityVerlet(dt, i + 1, tfp);
         Press *= PressFac;
 
@@ -355,22 +354,9 @@ int main()
 
         Tavg += Temp;
         Pavg += Press;
-        end = clock();
-
-        cpu_time_used = (double)(end - start) / CLOCKS_PER_SEC;
-        if (!reported)
-        {
-            printf("Execution time of 1 iteration is %f\n", cpu_time_used);
-            reported = 1;
-        }
-        now = time(NULL);
-        if (prev != now)
-        {
-
-            fprintf(ofp, "%ld, %.4f, %.4e, %.8f, %.8f, %.8f, %.8f, %.8f \n", now, cpu_time_used * 1000000, i * dt * timefac, Temp, Press, KE, PE, KE + PE);
 
         fprintf(ofp, "  %8.4e  %20.8f  %20.8f %20.8f  %20.8f  %20.8f \n", i * dt * timefac, Temp, Press, KE, PE, KE + PE);
-    
+
         end = clock();
 
         cpu_time_used = (double)(end - start) / CLOCKS_PER_SEC;
@@ -384,16 +370,15 @@ int main()
         {
 
             fprintf(ofp, "%ld, %.4f, %.4e, %.8f, %.8f, %.8f, %.8f, %.8f \n", now, cpu_time_used * 1000000, i * dt * timefac, Temp, Press, KE, PE, KE + PE);
-
             prev = now;
         }
     
-        }
+        
     }
 
     clock_t end_simulation_time = clock();
-    cpu_time_used = (double)(end_simulation_time - start_simulation_time) / CLOCKS_PER_SEC;
-    printf("Execution time the simulation is %f\n", cpu_time_used);
+    double cpu_time_used_sim = (double)(end_simulation_time - start_simulation_time) / CLOCKS_PER_SEC;
+    printf("Execution time the simulation is %f\n", cpu_time_used_sim);
 
     // Because we have calculated the instantaneous temperature and pressure,
     // we can take the average over the whole simulation here
@@ -561,6 +546,7 @@ void computeAccelerations()
     double f, rSqd;
     double rij[3]; // position of i relative to j
 
+    #pragma omp parallel for
     for (i = 0; i < N; i++)
     { // set all accelerations to zero
         for (k = 0; k < 3; k++)
@@ -569,6 +555,7 @@ void computeAccelerations()
         }
     }
 
+    #pragma omp parallel for schedule(dynamic) num_threads(NUM_THREADS)
     for (i = 0; i < N - 1; i++)
     { // loop over all distinct pairs i,j
         for (j = i + 1; j < N; j++)
