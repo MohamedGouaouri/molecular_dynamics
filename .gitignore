@@ -38,3 +38,5 @@ build/
 *.csv
 runs/*.txt
 runs/*.xyz
+cmake-build-debug
+.idea
