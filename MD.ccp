@@ -38,7 +38,7 @@ pthread_t threads[NUMTHREADS];
 
 clock_t start, end;
 double cpu_time_used;
-int NUMTHREADS = 8;
+
 
 // Number of particles
 int N;
@@ -494,18 +494,19 @@ double Kinetic()
 
     kin = 0.;
 
-    for (int i = 0; i < N; i++)
-    {
-
-        v2 = 0.;
-        for (int j = 0; j < 3; j++)
+    #pragma omp parallel for reduction(+ : kin)  private(v2)
+        for (int i = 0; i < N; i++)
         {
 
-            v2 += v[i][j] * v[i][j];
-        }
-        kin += m * v2 / 2.;
-    }
+            v2 = 0.;
+            for (int j = 0; j < 3; j++)
+            {
 
+                v2 += v[i][j] * v[i][j];
+            }
+            kin += m * v2 / 2.;
+        }
+        
     // printf("  Total Kinetic Energy is %f\n",N*mvs*m/2.);
     return kin;
 }
