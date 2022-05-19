@@ -38,5 +38,8 @@ build/
 *.csv
 runs/*.txt
 runs/*.xyz
+<<<<<<< HEAD
 cmake-build-debug
 .idea
+=======
+>>>>>>> openMp/computeAccelerations
