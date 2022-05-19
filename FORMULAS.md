@@ -17,4 +17,6 @@ To be searched for and described asap
 
 ## kinetic energy formula
 The kinetic energy formula is stated as follows:  
-$K = \frac{1}{2} m.v^{2}$
+$K = \frac{1}{2} m.v^{2}$  
+
+
