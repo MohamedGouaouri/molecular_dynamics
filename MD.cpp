@@ -39,9 +39,6 @@ double cpu_time_used;
 // Number of particles
 int N;
 
-// Number of threads
-#define NUM_THREADS 8
-
 //  Lennard-Jones parameters in natural units!
 double sigma = 1.;
 double epsilon = 1.;
@@ -688,11 +685,12 @@ double VelocityVerlet(double dt, int iter, FILE *fp)
 
 void initializeVelocities()
 {
-
+    clock_t start, end;
+    start = clock();
     int i, j;
 
     // TODO: Parallalize this  loop
-
+    #pragma omp parallel for schedule(dynamic,N/NUMTHREADS) num_threads(NUMTHREADS)
     for (i = 0; i < N; i++)
     {
 
@@ -708,7 +706,7 @@ void initializeVelocities()
     double vCM[3] = {0, 0, 0};
 
     // TODO: Parallalize this  loop
-
+    #pragma omp parallel for schedule(dynamic,N/NUMTHREADS) num_threads(NUMTHREADS)
     for (i = 0; i < N; i++)
     {
         for (j = 0; j < 3; j++)
@@ -727,7 +725,7 @@ void initializeVelocities()
     //  not drift in space!
 
     // TODO: Parallalize this  loop
-
+    #pragma omp parallel for schedule(dynamic,N/NUMTHREADS) num_threads(NUMTHREADS)
     for (i = 0; i < N; i++)
     {
         for (j = 0; j < 3; j++)
@@ -743,7 +741,7 @@ void initializeVelocities()
     vSqdSum = 0.;
 
     // TODO: Parallalize this  loop
-
+    #pragma omp parallel for reduction(+ : vSqdSum)
     for (i = 0; i < N; i++)
     {
         for (j = 0; j < 3; j++)
@@ -756,7 +754,7 @@ void initializeVelocities()
     lambda = sqrt(3 * (N - 1) * Tinit / vSqdSum);
 
     // TODO: Parallalize this  loop
-
+    #pragma omp parallel for schedule(dynamic,N/NUMTHREADS) num_threads(NUMTHREADS)
     for (i = 0; i < N; i++)
     {
         for (j = 0; j < 3; j++)
@@ -765,6 +763,9 @@ void initializeVelocities()
             v[i][j] *= lambda;
         }
     }
+    end = clock();
+    double total_time = ((double) (end - start)) / CLOCKS_PER_SEC;
+    printf("\ninitializeVelocities took %f seconds to execute\n", total_time);
 }
 
 //  Numerical recipes Gaussian distribution number generator
