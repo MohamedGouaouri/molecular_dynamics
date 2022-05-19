@@ -27,6 +27,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
+#include <time.h>
 #include <omp.h>
 
 #define NUMTHREADS 8
@@ -266,8 +267,10 @@ int main()
     else
     {
         dt = 0.5e-14 / timefac;
-        NumTime = 20000;
+        NumTime = 20;
     }
+
+    clock_t start_simulation_time = clock();
 
     //  Put all the atoms in simple crystal lattice and give them random velocities
     //  that corresponds to the initial temperature we have specified
@@ -286,12 +289,17 @@ int main()
     Pavg = 0;
     Tavg = 0;
 
+    long prev = time(NULL);
+    long now;
+    prev = time(NULL);
+    int reported =0;
+
     int tenp = floor(NumTime / 10);
     fprintf(ofp, "  time (s)              T(t) (K)              P(t) (Pa)           Kinetic En. (n.u.)     Potential En. (n.u.) Total En. (n.u.)\n");
     printf("  PERCENTAGE OF CALCULATION COMPLETE:\n  [");
     for (i = 0; i < NumTime + 1; i++)
     {
-
+        start = clock();
         //  This just prints updates on progress of the calculation for the users convenience
         if (i == tenp)
             printf(" 10 |");
@@ -329,6 +337,7 @@ int main()
         mvs = MeanSquaredVelocity();
         KE = Kinetic();
         PE = Potential();
+        //printf("PE=%15.5f",PE);
 
         // Temperature from Kinetic Theory
         Temp = m * mvs / (3 * kB) * TempFac;
@@ -341,8 +350,27 @@ int main()
 
         Tavg += Temp;
         Pavg += Press;
+        end = clock();
 
         fprintf(ofp, "  %8.4e  %20.8f  %20.8f %20.8f  %20.8f  %20.8f \n", i * dt * timefac, Temp, Press, KE, PE, KE + PE);
+    
+        end = clock();
+
+        cpu_time_used = (double)(end - start) / CLOCKS_PER_SEC;
+        if (!reported)
+        {
+            printf("Execution time of 1 iteration is %f\n", cpu_time_used);
+            reported = 1;
+        }
+        now = time(NULL);
+        if (prev != now)
+        {
+
+            fprintf(ofp, "%ld, %.4f, %.4e, %.8f, %.8f, %.8f, %.8f, %.8f \n", now, cpu_time_used * 1000000, i * dt * timefac, Temp, Press, KE, PE, KE + PE);
+
+            prev = now;
+        }
+
     }
 
     // Because we have calculated the instantaneous temperature and pressure,
@@ -378,6 +406,9 @@ void initialize()
     int n, p, i, j, k;
     double pos;
 
+    clock_t start, end;
+    start = clock();
+
     // Number of atoms in each direction
     n = int(ceil(pow(N, 1.0 / 3)));
 
@@ -388,23 +419,29 @@ void initialize()
     p = 0;
     //  initialize positions
 
-    for (i = 0; i < n; i++)
-    {
-        for (j = 0; j < n; j++)
-        {
-            for (k = 0; k < n; k++)
-            {
-                if (p < N)
-                {
+    #pragma omp parallel for schedule(dynamic,N/NUMTHREADS) num_threads(NUMTHREADS)
 
-                    r[p][0] = (i + 0.5) * pos;
-                    r[p][1] = (j + 0.5) * pos;
-                    r[p][2] = (k + 0.5) * pos;
+        for (i = 0; i < n; i++)
+        {
+            for (j = 0; j < n; j++)
+            {
+                for (k = 0; k < n; k++)
+                {
+                    if (p < N)
+                    {
+
+                        r[p][0] = (i + 0.5) * pos;
+                        r[p][1] = (j + 0.5) * pos;
+                        r[p][2] = (k + 0.5) * pos;
+                    }
+                    p++;
                 }
-                p++;
             }
         }
-    }
+
+    end = clock();
+    double total_time = ((double) (end - start)) / CLOCKS_PER_SEC;
+    printf("\nInitialize took %f seconds to execute\n", total_time);
 
     // Call function to initialize velocities
     initializeVelocities();
@@ -453,30 +490,39 @@ double Kinetic()
 
     kin = 0.;
 
-    for (int i = 0; i < N; i++)
-    {
-
-        v2 = 0.;
-        for (int j = 0; j < 3; j++)
+    #pragma omp parallel for reduction(+ : kin)  private(v2)
+        for (int i = 0; i < N; i++)
         {
 
-            v2 += v[i][j] * v[i][j];
-        }
-        kin += m * v2 / 2.;
-    }
+            v2 = 0.;
+            for (int j = 0; j < 3; j++)
+            {
 
+                v2 += v[i][j] * v[i][j];
+            }
+            kin += m * v2 / 2.;
+        }
+        
     // printf("  Total Kinetic Energy is %f\n",N*mvs*m/2.);
     return kin;
 }
 
+//-------------Start_openMp_Potential----------
+
 // Function to calculate the potential energy of the system
 double Potential()
 {
+
+    double temps_debut, temps_fin;
+    long double temps_total_pris_reduction;
+
     double quot, r2, rnorm, term1, term2, Pot;
     int i, j, k;
 
     Pot = 0.;
+    temps_debut = omp_get_wtime();
 
+    #pragma omp parallel for reduction(+ : Pot)  private(r2)
     for (i = 0; i < N; i++)
     {
         for (j = 0; j < N; j++)
@@ -499,8 +545,15 @@ double Potential()
         }
     }
 
+    temps_fin = omp_get_wtime();
+    temps_total_pris_reduction = (temps_fin- temps_debut);
+    printf("Temps parallel reduction: %Lf\n", temps_total_pris_reduction);
+
     return Pot;
 }
+//-------------End_openMp_Potential-----------
+
+
 
 //   Uses the derivative of the Lennard-Jones potential to calculate
 //   the forces on each atom.  Then uses a = F/m to calculate the

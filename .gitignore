@@ -36,3 +36,13 @@ __pycache__
 .vscode
 *.txt
 build/
+*.txt
+__pycache__/
+.vscode/
+build/
+*.xyz
+*.csv
+runs/*.txt
+runs/*.xyz
+cmake-build-debug
+.idea/

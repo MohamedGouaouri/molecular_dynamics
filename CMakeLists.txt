@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.0)
+project(molecular_dynamics)
+set(CMAKE_CXX_STANDARD  14)
+set(CMAKE_CXX_FLAGS  -fopenmp)
+add_executable(molecular_dynamics MD.cpp)
