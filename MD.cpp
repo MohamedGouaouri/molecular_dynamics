@@ -30,11 +30,10 @@
 #include <omp.h>
 #include <time.h>
 
-#define NUMTHREADS 8
+#define NUMTHREADS 4
 
 // timing variables
-clock_t start, end;
-double cpu_time_used;
+double start, end, time_used;
 
 // Number of particles
 int N;
@@ -90,6 +89,8 @@ double Kinetic();
 
 int main()
 {
+
+    omp_set_num_threads(NUMTHREADS);
 
     //  variable delcarations
     int i;
@@ -219,7 +220,10 @@ int main()
     printf("  NUMBER DENSITY OF LIQUID ARGON AT 1 ATM AND 87 K IS ABOUT 35000 moles/m^3\n");
 
     scanf("%lf", &rho);
-    N = 216;
+
+    // ======================= NB particles ===============================
+    N = 1000;
+
     Vol = N / (rho * NA);
 
     Vol /= VolFac;
@@ -254,23 +258,22 @@ int main()
     afp = fopen(afn, "w"); //  Average T, P, gc, etc from the simulation
 
     int NumTime;
-    if (strcmp(atype, "He") == 0)
-    {
+    // if (strcmp(atype, "He") == 0)
+    // {
 
-        // dt in natural units of time s.t. in SI it is 5 f.s. for all other gasses
-        dt = 0.2e-14 / timefac;
-        //  We will run the simulation for NumTime timesteps.
-        //  The total time will be NumTime*dt in natural units
-        //  And NumTime*dt multiplied by the appropriate conversion factor for time in seconds
-        NumTime = 50000;
-    }
-    else
-    {
-        dt = 0.5e-14 / timefac;
-        NumTime = 20;
-    }
-
-    clock_t start_simulation_time = clock();
+    //     // dt in natural units of time s.t. in SI it is 5 f.s. for all other gasses
+    //     dt = 0.2e-14 / timefac;
+    //     //  We will run the simulation for NumTime timesteps.
+    //     //  The total time will be NumTime*dt in natural units
+    //     //  And NumTime*dt multiplied by the appropriate conversion factor for time in seconds
+    //     NumTime = 50000;
+    // }
+    // else
+    // {
+    //     dt = 0.5e-14 / timefac;
+    //     NumTime = 20;
+    // }
+    NumTime = 400;
 
     //  Put all the atoms in simple crystal lattice and give them random velocities
     //  that corresponds to the initial temperature we have specified
@@ -293,7 +296,6 @@ int main()
     fprintf(ofp, "  time (s)              T(t) (K)              P(t) (Pa)           Kinetic En. (n.u.)     Potential En. (n.u.) Total En. (n.u.)\n");
     printf("  PERCENTAGE OF CALCULATION COMPLETE:\n  [");
 
-    clock_t start, end;
     long prev = time(NULL);
     long now;
     prev = time(NULL);
@@ -328,7 +330,7 @@ int main()
         // This updates the positions and velocities using Newton's Laws
         // Also computes the Pressure as the sum of momentum changes from wall collisions / timestep
         // which is a Kinetic Theory of gasses concept of Pressure
-        start = clock();
+        start = omp_get_wtime();
 
         Press = VelocityVerlet(dt, i + 1, tfp);
         Press *= PressFac;
@@ -357,26 +359,25 @@ int main()
 
         fprintf(ofp, "  %8.4e  %20.8f  %20.8f %20.8f  %20.8f  %20.8f \n", i * dt * timefac, Temp, Press, KE, PE, KE + PE);
 
-        end = clock();
+        end = omp_get_wtime();
 
-        cpu_time_used = (double)(end - start) / CLOCKS_PER_SEC;
+        time_used = end - start;
         if (!reported)
         {
-            printf("Execution time of 1 iteration is %f\n", cpu_time_used);
+            printf("Execution time of 1 iteration is %f\n", time_used);
             reported = 1;
         }
         now = time(NULL);
         if (prev != now)
         {
 
-            fprintf(ofp, "%ld, %.4f, %.4e, %.8f, %.8f, %.8f, %.8f, %.8f \n", now, cpu_time_used * 1000000, i * dt * timefac, Temp, Press, KE, PE, KE + PE);
+            fprintf(ofp, "%ld, %.4f, %.4e, %.8f, %.8f, %.8f, %.8f, %.8f \n", now, time_used, i * dt * timefac, Temp, Press, KE, PE, KE + PE);
             prev = now;
         }
     }
 
-    clock_t end_simulation_time = clock();
-    double cpu_time_used_sim = (double)(end_simulation_time - start_simulation_time) / CLOCKS_PER_SEC;
-    printf("Execution time the simulation is %f\n", cpu_time_used_sim);
+    end =
+        printf("Execution time the simulation is %f\n", time_used);
 
     // Because we have calculated the instantaneous temperature and pressure,
     // we can take the average over the whole simulation here
@@ -411,9 +412,6 @@ void initialize()
     int n, p, i, j, k;
     double pos;
 
-    clock_t start, end;
-    start = clock();
-
     // Number of atoms in each direction
     n = int(ceil(pow(N, 1.0 / 3)));
 
@@ -443,10 +441,6 @@ void initialize()
             }
         }
     }
-
-    end = clock();
-    double total_time = ((double)(end - start)) / CLOCKS_PER_SEC;
-    printf("\nInitialize took %f seconds to execute\n", total_time);
 
     // Call function to initialize velocities
     initializeVelocities();
@@ -519,14 +513,14 @@ double Kinetic()
 double Potential()
 {
 
-    double temps_debut, temps_fin;
-    long double temps_total_pris_reduction;
+    // double temps_debut, temps_fin;
+    // long double temps_total_pris_reduction;
 
     double quot, r2, rnorm, term1, term2, Pot;
     int i, j, k;
 
     Pot = 0.;
-    temps_debut = omp_get_wtime();
+    // temps_debut = omp_get_wtime();
 
 #pragma omp parallel for reduction(+ \
                                    : Pot) private(r2)
@@ -552,9 +546,9 @@ double Potential()
         }
     }
 
-    temps_fin = omp_get_wtime();
-    temps_total_pris_reduction = (temps_fin - temps_debut);
-    printf("Temps parallel reduction: %Lf\n", temps_total_pris_reduction);
+    // temps_fin = omp_get_wtime();
+    // temps_total_pris_reduction = (temps_fin - temps_debut);
+    // printf("Temps parallel reduction: %Lf\n", temps_total_pris_reduction);
 
     return Pot;
 }
@@ -578,7 +572,7 @@ void computeAccelerations()
         }
     }
 
-#pragma omp parallel for schedule(dynamic) num_threads(NUM_THREADS)
+#pragma omp parallel for schedule(dynamic) num_threads(NUMTHREADS)
     for (i = 0; i < N - 1; i++)
     { // loop over all distinct pairs i,j
         for (j = i + 1; j < N; j++)
@@ -612,14 +606,16 @@ double VelocityVerlet(double dt, int iter, FILE *fp)
     int i, j, k;
 
     double psum = 0.;
-    omp_set_num_threads(NUMTHREADS);
+
     //  Compute accelerations from forces at current position
     computeAccelerations();
     //  Update positions and velocity with current velocity and acceleration
     // printf("  Updated Positions!\n");
 
-#pragma omp parallel for shared(r, a, v, dt)
+#pragma omp parallel shared(r, a, v, dt)
     {
+#pragma omp for
+
         for (i = 0; i < N; i++)
         {
             for (j = 0; j < 3; j++)
@@ -634,8 +630,10 @@ double VelocityVerlet(double dt, int iter, FILE *fp)
     //  Update accellerations from updated positions
     computeAccelerations();
 //  Update velocity with updated acceleration
-#pragma omp parallel for shared(a, v, dt)
+#pragma omp parallel shared(a, v, dt)
     {
+#pragma omp for
+
         for (i = 0; i < N; i++)
         {
             for (j = 0; j < 3; j++)
@@ -646,24 +644,24 @@ double VelocityVerlet(double dt, int iter, FILE *fp)
     }
 
 // Elastic walls
-#pragma omp parallel
+#pragma omp parallel shared(r, v, m, dt, L)
     {
-#pragma omp for shared(r, v, m, dt, L) reduction(+, psum)
+#pragma omp for reduction(+ \
+                          : psum)
+
+        for (i = 0; i < N; i++)
         {
-            for (i = 0; i < N; i++)
+            for (j = 0; j < 3; j++)
             {
-                for (j = 0; j < 3; j++)
+                if (r[i][j] < 0.)
                 {
-                    if (r[i][j] < 0.)
-                    {
-                        v[i][j] *= -1.;                     //- elastic walls
-                        psum += 2 * m * fabs(v[i][j]) / dt; // contribution to pressure from "left" walls
-                    }
-                    if (r[i][j] >= L)
-                    {
-                        v[i][j] *= -1.;                     //- elastic walls
-                        psum += 2 * m * fabs(v[i][j]) / dt; // contribution to pressure from "right" walls
-                    }
+                    v[i][j] *= -1.;                     //- elastic walls
+                    psum += 2 * m * fabs(v[i][j]) / dt; // contribution to pressure from "left" walls
+                }
+                if (r[i][j] >= L)
+                {
+                    v[i][j] *= -1.;                     //- elastic walls
+                    psum += 2 * m * fabs(v[i][j]) / dt; // contribution to pressure from "right" walls
                 }
             }
         }
@@ -685,12 +683,11 @@ double VelocityVerlet(double dt, int iter, FILE *fp)
 
 void initializeVelocities()
 {
-    clock_t start, end;
-    start = clock();
+
     int i, j;
 
-    // TODO: Parallalize this  loop
-    #pragma omp parallel for schedule(dynamic,N/NUMTHREADS) num_threads(NUMTHREADS)
+// TODO: Parallalize this  loop
+#pragma omp parallel for schedule(dynamic, N / NUMTHREADS) num_threads(NUMTHREADS)
     for (i = 0; i < N; i++)
     {
 
@@ -705,8 +702,8 @@ void initializeVelocities()
     // Compute center-of-mas velocity according to the formula above
     double vCM[3] = {0, 0, 0};
 
-    // TODO: Parallalize this  loop
-    #pragma omp parallel for schedule(dynamic,N/NUMTHREADS) num_threads(NUMTHREADS)
+// TODO: Parallalize this  loop
+#pragma omp parallel for schedule(dynamic, N / NUMTHREADS) num_threads(NUMTHREADS)
     for (i = 0; i < N; i++)
     {
         for (j = 0; j < 3; j++)
@@ -719,13 +716,13 @@ void initializeVelocities()
     for (i = 0; i < 3; i++)
         vCM[i] /= N * m;
 
-    //  Subtract out the center-of-mass velocity from the
-    //  velocity of each particle... effectively set the
-    //  center of mass velocity to zero so that the system does
-    //  not drift in space!
+//  Subtract out the center-of-mass velocity from the
+//  velocity of each particle... effectively set the
+//  center of mass velocity to zero so that the system does
+//  not drift in space!
 
-    // TODO: Parallalize this  loop
-    #pragma omp parallel for schedule(dynamic,N/NUMTHREADS) num_threads(NUMTHREADS)
+// TODO: Parallalize this  loop
+#pragma omp parallel for schedule(dynamic, N / NUMTHREADS) num_threads(NUMTHREADS)
     for (i = 0; i < N; i++)
     {
         for (j = 0; j < 3; j++)
@@ -740,8 +737,9 @@ void initializeVelocities()
     double vSqdSum, lambda;
     vSqdSum = 0.;
 
-    // TODO: Parallalize this  loop
-    #pragma omp parallel for reduction(+ : vSqdSum)
+// TODO: Parallalize this  loop
+#pragma omp parallel for reduction(+ \
+                                   : vSqdSum)
     for (i = 0; i < N; i++)
     {
         for (j = 0; j < 3; j++)
@@ -753,8 +751,8 @@ void initializeVelocities()
 
     lambda = sqrt(3 * (N - 1) * Tinit / vSqdSum);
 
-    // TODO: Parallalize this  loop
-    #pragma omp parallel for schedule(dynamic,N/NUMTHREADS) num_threads(NUMTHREADS)
+// TODO: Parallalize this  loop
+#pragma omp parallel for schedule(dynamic, N / NUMTHREADS) num_threads(NUMTHREADS)
     for (i = 0; i < N; i++)
     {
         for (j = 0; j < 3; j++)
@@ -763,9 +761,6 @@ void initializeVelocities()
             v[i][j] *= lambda;
         }
     }
-    end = clock();
-    double total_time = ((double) (end - start)) / CLOCKS_PER_SEC;
-    printf("\ninitializeVelocities took %f seconds to execute\n", total_time);
 }
 
 //  Numerical recipes Gaussian distribution number generator
