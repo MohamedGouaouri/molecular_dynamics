@@ -503,7 +503,7 @@ double Potential()
 
     cudaMalloc( (void**)&dev_Pot, size);
 
-    int Pot = 0;
+    double Pot = 0;
     cudaMemcpy( dev_Pot, Pot, size, cudaMemcpyHostToDevice);
 
     dim3 grid_size(1); //1 BLOCK
