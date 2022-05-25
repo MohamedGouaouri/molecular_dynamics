@@ -1,10 +1,9 @@
 {
     "simulation": "Molecular dynamics simulatio",
-    "version": "sequantial",
+    "version": "seq",
     "runs": [
         {
-            "name": "run4",
-            "maintainer": "Mohammed",
+            "name": "run1_seq",
             "configuration": {
                 "Gaz": "He",
                 "Number of particles": 500,
@@ -12,40 +11,49 @@
                 "Density": 2000
             },
             "results": {
-                "cpu_time (1 iteration)": 0.050243,
-                "cpu_time (simulation)": 2406.585363,
+                "cpu_time (simulation)": 10.065391,
                 "Dashboard URL (Local)": "",
                 "Dashboard URL (Public)": ""
             }
         },
         {
-            "name": "run5",
-            "maintainer": "Mohammed",
+            "name": "run2_seq",
             "configuration": {
                 "Gaz": "He",
-                "Number of particles": 700,
+                "Number of particles": 200,
                 "Temperature": 1500,
                 "Density": 2000
             },
             "results": {
-                "cpu_time (1 iteration)": 0,
-                "cpu_time (simulation)": 0,
+                "cpu_time (simulation)": 1.598632,
                 "Dashboard URL (Local)": "",
                 "Dashboard URL (Public)": ""
             }
         },
         {
-            "name": "run6",
-            "maintainer": "Mohammed",
+            "name": "run3_seq",
             "configuration": {
                 "Gaz": "He",
-                "Number of particles": 900,
+                "Number of particles": 500,
                 "Temperature": 1500,
                 "Density": 2000
             },
             "results": {
-                "cpu_time (1 iteration)": 0,
-                "cpu_time (simulation)": 0,
+                "cpu_time (simulation)": 10.546010,
+                "Dashboard URL (Local)": "",
+                "Dashboard URL (Public)": ""
+            }
+        },
+        {
+            "name": "run4_seq",
+            "configuration": {
+                "Gaz": "He",
+                "Number of particles": 1000,
+                "Temperature": 1500,
+                "Density": 2000
+            },
+            "results": {
+                "cpu_time (simulation)": 41.422685,
                 "Dashboard URL (Local)": "",
                 "Dashboard URL (Public)": ""
             }
