@@ -28,6 +28,7 @@
 #include <math.h>
 #include <string.h>
 
+#define NUMTHREADS 8
 // Number of particles
 int N;
 
@@ -462,19 +463,20 @@ double Kinetic()
     return kin;
 }
 
-// Function to calculate the potential energy of the system
-double Potential()
+__global__ void potentialRoutine(double *Pot)
 {
-    double quot, r2, rnorm, term1, term2, Pot;
-    int i, j, k;
 
+    double quot, r2, rnorm, term1, term2;
+    int j, k;
     Pot = 0.;
 
-    for (i = 0; i < N; i++)
+    int i = threadIdx.x;
+	// int T = blockDim.x;
+
+    for (i < N)
     {
         for (j = 0; j < N; j++)
         {
-
             if (j != i)
             {
                 r2 = 0.;
@@ -491,6 +493,30 @@ double Potential()
             }
         }
     }
+}
+
+// Function to calculate the potential energy of the system
+double Potential()
+{
+    double *dev_Pot; 
+    int size = N * sizeof(double);
+
+    cudaMalloc( (void**)&dev_Pot, size);
+
+    int Pot = 0;
+    cudaMemcpy( dev_Pot, Pot, size, cudaMemcpyHostToDevice);
+
+    dim3 grid_size(1); //1 BLOCK
+    dim3 block_size(NUMTHREADS) // 8 THREADS IN THE BLOCK
+
+    potentialRoutine<<<grid_size,block_size>>>(dev_Pot);
+
+    cudaDeviceSynchronize();
+
+    cudaMemcpy( Pot, dev_Pot, size, cudaMemcpyDeviceToHost);
+
+    free( Pot );
+    cudaFree( dev_Pot );
 
     return Pot;
 }
