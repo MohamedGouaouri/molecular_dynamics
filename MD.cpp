@@ -27,15 +27,6 @@
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
-#include <omp.h>
-
-#include <pthread.h>
-#define NUMTHREADS 4
-pthread_t threads[NUMTHREADS];
-
-#include <time.h>
-clock_t start, end;
-double cpu_time_used;
 
 // Number of particles
 int N;
@@ -268,7 +259,7 @@ int main()
     else
     {
         dt = 0.5e-14 / timefac;
-        NumTime = 20;
+        NumTime = 20000;
     }
 
     //  Put all the atoms in simple crystal lattice and give them random velocities
@@ -331,7 +322,6 @@ int main()
         mvs = MeanSquaredVelocity();
         KE = Kinetic();
         PE = Potential();
-        //printf("PE=%15.5f",PE);
 
         // Temperature from Kinetic Theory
         Temp = m * mvs / (3 * kB) * TempFac;
@@ -472,22 +462,14 @@ double Kinetic()
     return kin;
 }
 
-//-------------Start_openMp_Potential----------
-
 // Function to calculate the potential energy of the system
 double Potential()
 {
-
-    double temps_debut, temps_fin;
-    long double temps_total_pris_reduction;
-
     double quot, r2, rnorm, term1, term2, Pot;
     int i, j, k;
 
     Pot = 0.;
-    temps_debut = omp_get_wtime();
 
-    #pragma omp parallel for reduction(+ : Pot)  private(r2)
     for (i = 0; i < N; i++)
     {
         for (j = 0; j < N; j++)
@@ -510,15 +492,8 @@ double Potential()
         }
     }
 
-    temps_fin = omp_get_wtime();
-    temps_total_pris_reduction = (temps_fin- temps_debut);
-    printf("Temps parallel reduction: %Lf\n", temps_total_pris_reduction);
-
     return Pot;
 }
-//-------------End_openMp_Potential-----------
-
-
 
 //   Uses the derivative of the Lennard-Jones potential to calculate
 //   the forces on each atom.  Then uses a = F/m to calculate the
