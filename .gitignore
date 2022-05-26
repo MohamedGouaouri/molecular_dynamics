@@ -30,3 +30,7 @@
 *.exe
 *.out
 *.app
+runs/
+*.txt
+*.xyz
+build
