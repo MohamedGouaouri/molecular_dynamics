@@ -30,7 +30,11 @@
 *.exe
 *.out
 *.app
-runs/
 *.txt
+__pycache__/
+.vscode/
+build/
 *.xyz
-build
+*.csv
+runs/*.txt
+runs/*.xyz

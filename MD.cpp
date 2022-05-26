@@ -27,6 +27,8 @@
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
+#include <time.h>
+#include <omp.h>
 
 // Number of particles
 int N;
@@ -211,7 +213,7 @@ int main()
     printf("  NUMBER DENSITY OF LIQUID ARGON AT 1 ATM AND 87 K IS ABOUT 35000 moles/m^3\n");
 
     scanf("%lf", &rho);
-    N = 216;
+    N = 1000;
     Vol = N / (rho * NA);
 
     Vol /= VolFac;
@@ -245,22 +247,22 @@ int main()
     ofp = fopen(ofn, "w"); //  Output of other quantities (T, P, gc, etc) at every timestep
     afp = fopen(afn, "w"); //  Average T, P, gc, etc from the simulation
 
-    int NumTime;
-    if (strcmp(atype, "He") == 0)
-    {
+    int NumTime = 400;
+    // if (strcmp(atype, "He") == 0)
+    // {
 
-        // dt in natural units of time s.t. in SI it is 5 f.s. for all other gasses
-        dt = 0.2e-14 / timefac;
-        //  We will run the simulation for NumTime timesteps.
-        //  The total time will be NumTime*dt in natural units
-        //  And NumTime*dt multiplied by the appropriate conversion factor for time in seconds
-        NumTime = 50000;
-    }
-    else
-    {
-        dt = 0.5e-14 / timefac;
-        NumTime = 20000;
-    }
+    //     // dt in natural units of time s.t. in SI it is 5 f.s. for all other gasses
+    //     dt = 0.2e-14 / timefac;
+    //     //  We will run the simulation for NumTime timesteps.
+    //     //  The total time will be NumTime*dt in natural units
+    //     //  And NumTime*dt multiplied by the appropriate conversion factor for time in seconds
+    //     NumTime = 50000;
+    // }
+    // else
+    // {
+    //     dt = 0.5e-14 / timefac;
+    //     NumTime = 20000;
+    // }
 
     //  Put all the atoms in simple crystal lattice and give them random velocities
     //  that corresponds to the initial temperature we have specified
@@ -280,8 +282,14 @@ int main()
     Tavg = 0;
 
     int tenp = floor(NumTime / 10);
-    fprintf(ofp, "  time (s)              T(t) (K)              P(t) (Pa)           Kinetic En. (n.u.)     Potential En. (n.u.) Total En. (n.u.)\n");
+    fprintf(ofp, "timestamp,time (s),T(t) (K),P(t) (Pa),Kinetic En. (n.u.),Potential En. (n.u.),Total En. (n.u.)\n");
     printf("  PERCENTAGE OF CALCULATION COMPLETE:\n  [");
+    double start_simulation_time = omp_get_wtime();
+    double start, end, cpu_time_used;
+    long prev = time(NULL);
+    long now;
+    prev = time(NULL);
+    int reported = 0;
     for (i = 0; i < NumTime + 1; i++)
     {
 
@@ -308,6 +316,7 @@ int main()
             printf(" 100 ]\n");
         fflush(stdout);
 
+        start = omp_get_wtime();
         // This updates the positions and velocities using Newton's Laws
         // Also computes the Pressure as the sum of momentum changes from wall collisions / timestep
         // which is a Kinetic Theory of gasses concept of Pressure
@@ -334,9 +343,28 @@ int main()
 
         Tavg += Temp;
         Pavg += Press;
+        end = omp_get_wtime();
 
-        fprintf(ofp, "  %8.4e  %20.8f  %20.8f %20.8f  %20.8f  %20.8f \n", i * dt * timefac, Temp, Press, KE, PE, KE + PE);
+        cpu_time_used = end - start;
+        if (!reported)
+        {
+            printf("Execution time of 1 iteration is %f\n", cpu_time_used);
+            reported = 1;
+        }
+        now = time(NULL);
+        if (prev != now)
+        {
+
+            fprintf(ofp, "%ld, %.4f, %.4e, %.8f, %.8f, %.8f, %.8f, %.8f \n", now, cpu_time_used * 1000000, i * dt * timefac, Temp, Press, KE, PE, KE + PE);
+
+            prev = now;
+        }
+        // printf("hi\n");
     }
+
+    double end_simulation_time = omp_get_wtime();
+    cpu_time_used = end_simulation_time - start_simulation_time;
+    printf("Execution time the simulation is %f\n", cpu_time_used);
 
     // Because we have calculated the instantaneous temperature and pressure,
     // we can take the average over the whole simulation here
@@ -542,6 +570,7 @@ void computeAccelerations()
 // returns sum of dv/dt*m/A (aka Pressure) from elastic collisions with walls
 double VelocityVerlet(double dt, int iter, FILE *fp)
 {
+    clock_t start = clock();
     int i, j, k;
 
     double psum = 0.;
@@ -598,9 +627,24 @@ double VelocityVerlet(double dt, int iter, FILE *fp)
         }
         fprintf(fp, "\n");
     }
+
+    clock_t end = clock();
+    double cpu_time_used = ((double)(end - start)) / CLOCKS_PER_SEC;
+
+    // printf("velocityVerlet() took %f seconds to execute\n", cpu_time_used);
+    // char command[255];
+    // for (size_t i = 0; i < 255; i++)
+    // {
+    //     command[i] = '\0';
+    // }
+
+    // sprintf(command, "paho_c_pub -t %s --connection 127.0.0.1:1883 -m %f 2>/dev/null", "velocity", cpu_time_used * 1000000);
+    // system(command);
+    // printf(command);
     // fprintf(fp,"\n \n");
 
-    return psum / (6 * L * L);
+    return psum /
+           (6 * L * L);
 }
 
 void initializeVelocities()
