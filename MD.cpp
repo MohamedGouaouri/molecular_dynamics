@@ -467,14 +467,23 @@ double MeanSquaredVelocity()
     double vy2 = 0;
     double vz2 = 0;
     double v2;
-
-    for (int i = 0; i < N; i++)
+#pragma omp parallel shared(v)
     {
+#pragma omp for reduce(+        \
+                       : vx2, + \
+                       : vy2, + \
+                       : vz2)
+        {
+            for (int i = 0; i < N; i++)
+            {
 
-        vx2 = vx2 + v[i][0] * v[i][0];
-        vy2 = vy2 + v[i][1] * v[i][1];
-        vz2 = vz2 + v[i][2] * v[i][2];
+                vx2 = vx2 + v[i][0] * v[i][0];
+                vy2 = vy2 + v[i][1] * v[i][1];
+                vz2 = vz2 + v[i][2] * v[i][2];
+            }
+        }
     }
+
     v2 = (vx2 + vy2 + vz2) / N;
 
     // printf("  Average of x-component of velocity squared is %f\n",v2);
