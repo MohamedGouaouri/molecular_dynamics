@@ -440,14 +440,15 @@ double MeanSquaredVelocity()
 }
 
 
-__global__ void KineticRoutine(double *Pot){
+__global__ void KineticRoutine(double * partial_kins){
 
     unsigned int threadId = blockDim.x * blockIdx.x + threadIdx.x;
     int start = threadId * N /  NUMTHREADS;
     int  end = (threadId + 1) * N / NUMTHREADS;
-    double partialKin
+    double partialKin, v2;
+
     partialKin = 0.;
-    for (int i = t->start; i < t->end; i++)
+    for (int i = start; i < end ; i++)
     {
 
         v2 = 0.;
@@ -455,10 +456,9 @@ __global__ void KineticRoutine(double *Pot){
         {
             v2 += v[i][j] * v[i][j];
         }
-        partialKin += t->m * v2 / 2.;
+        partialKin += m * v2 / 2.;
     }
-
-
+    partial_kins[threadId] = partialKin;
 
 }
 //  Function to calculate the kinetic energy of the system
@@ -467,36 +467,35 @@ double Kinetic()
 
     int grid_size_int=1;
     dim3 grid_size(grid_size_int); //1 BLOCK
-    dim3 block_size(NUMTHREADS) // 8 THREADS IN THE BLOCK
+    dim3 block_size(NUMTHREADS); // 8 THREADS IN THE BLOCK
 
-    int size =  (1*NUMTHREADS) * sizeof(double );
+    int kinetic_arr_size =  (1*NUMTHREADS) * sizeof(double );
     double *partial_kins_array;
     double *partial_kins_array_dev;
+    // Initailize the partail sums to 0
+    partial_kins_array = (double*)malloc(kinetic_arr_size);
+    memset(partial_kins_array, 0, kinetic_arr_size);
 
-    cudaMalloc( (void**)&partial_kins_array_dev, size);
+    // Copy the partail sums content to partial sums_dev
+    cudaMalloc( (void**)&partial_kins_array_dev, kinetic_arr_size);
+    cudaMemcpy(partial_kins_array_dev, partial_kins_array, kinetic_arr_size, cudaMemcpyHostToDevice);
 
-
-
-    potentialRoutine<<<grid_size,block_size>>>(dev_Pot);
-
-    double v2, kin;
-
-    kin = 0.;
-
-    for (int i = 0; i < N; i++)
-    {
-
-        v2 = 0.;
-        for (int j = 0; j < 3; j++)
-        {
-
-            v2 += v[i][j] * v[i][j];
-        }
-        kin += m * v2 / 2.;
+    // Execute the routine 
+    KineticRoutine<<<grid_size,block_size>>>(partial_kins_array_dev);
+    // copy the result
+    cudaMemcpy(partial_kins_array, partial_kins_array_dev, kinetic_arr_size , cudaMemcpyDeviceToHost);
+    // Calculate the global sum
+    double final_kin = 0;
+    for (int i = 0; i < NUMTHREADS; i++) {
+        final_kin+=partial_kins_array[i];
     }
+    // liberate the ressources
+    free(partial_kins_array)
+    cudaFree(partial_kins_array_dev)
+
 
     // printf("  Total Kinetic Energy is %f\n",N*mvs*m/2.);
-    return kin;
+    return final_kin;
 }
 
 __global__ void potentialRoutine(double *Pot)

@@ -1,0 +1,2 @@
+CMakeLists.txt not found in C:\Users\pc\Documents\GitHub\molecular_dynamics\molecular_dynamics_solution\molecular_dynamics_solution Select CMakeLists.txt
+Visual Studio not found at: C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools Configure Disable profile
