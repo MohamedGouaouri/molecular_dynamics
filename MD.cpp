@@ -439,9 +439,45 @@ double MeanSquaredVelocity()
     return v2;
 }
 
+
+__global__ void KineticRoutine(double *Pot){
+
+    unsigned int threadId = blockDim.x * blockIdx.x + threadIdx.x;
+    int start = threadId * N /  NUMTHREADS;
+    int  end = (threadId + 1) * N / NUMTHREADS;
+    double partialKin
+    partialKin = 0.;
+    for (int i = t->start; i < t->end; i++)
+    {
+
+        v2 = 0.;
+        for (int j = 0; j < 3; j++)
+        {
+            v2 += v[i][j] * v[i][j];
+        }
+        partialKin += t->m * v2 / 2.;
+    }
+
+
+
+}
 //  Function to calculate the kinetic energy of the system
 double Kinetic()
 { // Write Function here!
+
+    int grid_size_int=1;
+    dim3 grid_size(grid_size_int); //1 BLOCK
+    dim3 block_size(NUMTHREADS) // 8 THREADS IN THE BLOCK
+
+    int size =  (1*NUMTHREADS) * sizeof(double );
+    double *partial_kins_array;
+    double *partial_kins_array_dev;
+
+    cudaMalloc( (void**)&partial_kins_array_dev, size);
+
+
+
+    potentialRoutine<<<grid_size,block_size>>>(dev_Pot);
 
     double v2, kin;
 
