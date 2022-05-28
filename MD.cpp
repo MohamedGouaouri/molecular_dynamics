@@ -29,7 +29,7 @@
 #include <string.h>
 #include <time.h>
 #include <omp.h>
-// #include <mpi.h>
+#include <mpi.h>
 
 double start, end, cpu_time_used;
 
@@ -54,7 +54,7 @@ double L;
 double Tinit; // 2;
 //  Vectors!
 //
-const int MAXPART = 5001;
+#define MAXPART 5001
 //  Position
 double r[MAXPART][3];
 //  Velocity
@@ -63,7 +63,8 @@ double v[MAXPART][3];
 double a[MAXPART][3];
 //  Force
 double F[MAXPART][3];
-
+int rank, size;
+    
 // atom type
 char atype[10];
 //  Function prototypes
@@ -92,7 +93,6 @@ int main()
 
     MPI_Init(NULL, NULL);
 
-    int rank, size;
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
@@ -300,7 +300,7 @@ int main()
         printf("  PERCENTAGE OF CALCULATION COMPLETE:\n  [");
     }
 
-    double start_simulation_time = omp_get_wtime();
+    //double start_simulation_time = omp_get_wtime();
     long prev = time(NULL);
     long now;
 
@@ -335,7 +335,7 @@ int main()
                 printf(" 100 ]\n");
             fflush(stdout);
 
-            start = omp_get_wtime();
+            //start = omp_get_wtime();
         }
 
         // This updates the positions and velocities using Newton's Laws
@@ -407,7 +407,7 @@ int main()
 
         if (rank == 0)
         {
-            end = omp_get_wtime();
+            //end = omp_get_wtime();
             if (!reported)
             {
                 printf("Execution time of 1 iteration is %f\n", cpu_time_used);
@@ -426,9 +426,9 @@ int main()
 
     if (rank == root)
     {
-        double end_simulation_time = omp_get_wtime();
-        cpu_time_used = end_simulation_time - start_simulation_time;
-        printf("Execution time the simulation is %f\n", cpu_time_used);
+        //double end_simulation_time = omp_get_wtime();
+        //cpu_time_used = end_simulation_time - start_simulation_time;
+        //printf("Execution time the simulation is %f\n", cpu_time_used);
 
         // Because we have calculated the instantaneous temperature and pressure,
         // we can take the average over the whole simulation here
@@ -475,8 +475,11 @@ void initialize()
     //  index for number of particles assigned positions
     p = 0;
     //  initialize positions
+    int num_iter = n/size;
+    int start = rank * num_iter;
+    int end = start + num_iter;
 
-    for (i = 0; i < n; i++)
+    for (i = start; i < end; i++)
     {
         for (j = 0; j < n; j++)
         {
@@ -493,7 +496,7 @@ void initialize()
             }
         }
     }
-
+    MPI_Barrier(MPI_COMM_WORLD);
     // Call function to initialize velocities
     initializeVelocities();
 
@@ -729,10 +732,13 @@ void initializeVelocities()
 {
 
     int i, j;
+    int num_iter = N/size;
+    int start = rank * num_iter;
+    int end = start + num_iter;
 
     // TODO: Parallalize this  loop
 
-    for (i = 0; i < N; i++)
+    for (i = start; i < end; i++)
     {
 
         for (j = 0; j < 3; j++)
@@ -748,7 +754,7 @@ void initializeVelocities()
 
     // TODO: Parallalize this  loop
 
-    for (i = 0; i < N; i++)
+    for (i = start; i < end; i++)
     {
         for (j = 0; j < 3; j++)
         {
@@ -756,10 +762,13 @@ void initializeVelocities()
             vCM[j] += m * v[i][j];
         }
     }
-
-    for (i = 0; i < 3; i++)
+    if(rank == root){
+	for (i = 0; i < 3; i++)
         vCM[i] /= N * m;
-
+    }
+    MPI_Barrier(MPI_COMM_WORLD);
+    
+    
     //  Subtract out the center-of-mass velocity from the
     //  velocity of each particle... effectively set the
     //  center of mass velocity to zero so that the system does
@@ -767,7 +776,7 @@ void initializeVelocities()
 
     // TODO: Parallalize this  loop
 
-    for (i = 0; i < N; i++)
+    for (i = start; i < end; i++)
     {
         for (j = 0; j < 3; j++)
         {
@@ -783,7 +792,7 @@ void initializeVelocities()
 
     // TODO: Parallalize this  loop
 
-    for (i = 0; i < N; i++)
+    for (i = start; i < end; i++)
     {
         for (j = 0; j < 3; j++)
         {
@@ -796,7 +805,7 @@ void initializeVelocities()
 
     // TODO: Parallalize this  loop
 
-    for (i = 0; i < N; i++)
+    for (i = start; i < end; i++)
     {
         for (j = 0; j < 3; j++)
         {
