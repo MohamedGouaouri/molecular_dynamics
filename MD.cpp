@@ -367,9 +367,12 @@ int main()
     return 0;
 }
 
-void initialize()
+
+__global__ void initializeRoutine(int *p)
 {
-    int n, p, i, j, k;
+    int i = threadIdx.x;
+
+    int n, j, k;
     double pos;
 
     // Number of atoms in each direction
@@ -382,7 +385,7 @@ void initialize()
     p = 0;
     //  initialize positions
 
-    for (i = 0; i < n; i++)
+    if( i < n )
     {
         for (j = 0; j < n; j++)
         {
@@ -399,6 +402,34 @@ void initialize()
             }
         }
     }
+}
+
+void initialize()
+{
+    int *p_th;
+
+    int p;
+
+    int size = N * sizeof(double);
+
+    cudaMalloc( (void**)&p_th, size);
+
+    //  index for number of particles assigned positions
+    p = 0;
+
+    cudaMemcpy( p_th, p, size, cudaMemcpyHostToDevice);
+
+    dim3 grid_size(1); //1 BLOCK
+    dim3 block_size(NUMTHREADS) // 8 THREADS IN THE BLOCK
+
+    initializeRoutine<<<grid_size,block_size>>>(p);
+
+    cudaDeviceSynchronize();
+
+    cudaMemcpy( p, p_th, size, cudaMemcpyDeviceToHost);
+
+    free( p );
+    cudaFree( p_th );
 
     // Call function to initialize velocities
     initializeVelocities();
@@ -508,7 +539,7 @@ __global__ void potentialRoutine(double *Pot)
     int i = threadIdx.x;
 	// int T = blockDim.x;
 
-    for (i < N)
+    if (i < N)
     {
         for (j = 0; j < N; j++)
         {
