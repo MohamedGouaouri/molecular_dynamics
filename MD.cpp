@@ -600,18 +600,13 @@ void computeAccelerations()
     }
 }
 
-// returns sum of dv/dt*m/A (aka Pressure) from elastic collisions with walls
-double VelocityVerlet(double dt, int iter, FILE *fp)
-{
-    int i, j, k;
+__global__ void VelocityVerletRoutineLoop1(double* r , double* v , double* a  , double* dt ){
 
-    double psum = 0.;
+    unsigned int threadId = blockDim.x * blockIdx.x + threadIdx.x;
+    int start = threadId * N /  NUMTHREADS;
+    int  end = (threadId + 1) * N / NUMTHREADS;
 
-    //  Compute accelerations from forces at current position
-    computeAccelerations();
-    //  Update positions and velocity with current velocity and acceleration
-    // printf("  Updated Positions!\n");
-    for (i = 0; i < N; i++)
+    for (i = start; i < end; i++)
     {
         for (j = 0; j < 3; j++)
         {
@@ -621,10 +616,16 @@ double VelocityVerlet(double dt, int iter, FILE *fp)
         }
         // printf("  %i  %6.4e   %6.4e   %6.4e\n",i,r[i][0],r[i][1],r[i][2]);
     }
-    //  Update accellerations from updated positions
-    computeAccelerations();
-    //  Update velocity with updated acceleration
-    for (i = 0; i < N; i++)
+
+}
+
+__global__ void VelocityVerletRoutineLoop2(double* r , double* v , double* a  , double* dt ){
+
+    unsigned int threadId = blockDim.x * blockIdx.x + threadIdx.x;
+    int start = threadId * N /  NUMTHREADS;
+    int  end = (threadId + 1) * N / NUMTHREADS;
+
+    for (i = start; i < end; i++)
     {
         for (j = 0; j < 3; j++)
         {
@@ -632,8 +633,15 @@ double VelocityVerlet(double dt, int iter, FILE *fp)
         }
     }
 
-    // Elastic walls
-    for (i = 0; i < N; i++)
+}
+
+__global__ void VelocityVerletRoutineLoop3(double* r , double* v , double* a  , double* dt , double* psum  , double* m , double* L){
+
+    unsigned int threadId = blockDim.x * blockIdx.x + threadIdx.x;
+    int start = threadId * N /  NUMTHREADS;
+    int  end = (threadId + 1) * N / NUMTHREADS;
+
+    for (i = start; i < end i++)
     {
         for (j = 0; j < 3; j++)
         {
@@ -650,7 +658,16 @@ double VelocityVerlet(double dt, int iter, FILE *fp)
         }
     }
 
-    for (i = 0; i < N; i++)
+}
+
+
+__global__ void VelocityVerletRoutineLoop4(double* r  , FILE* fp , char* atype ){
+
+    unsigned int threadId = blockDim.x * blockIdx.x + threadIdx.x;
+    int start = threadId * N /  NUMTHREADS;
+    int  end = (threadId + 1) * N / NUMTHREADS;
+
+    for (i = start; i < end; i++)
     {
         fprintf(fp, "%s", atype);
         for (j = 0; j < 3; j++)
@@ -659,6 +676,106 @@ double VelocityVerlet(double dt, int iter, FILE *fp)
         }
         fprintf(fp, "\n");
     }
+
+}
+
+
+// returns sum of dv/dt*m/A (aka Pressure) from elastic collisions with walls
+double VelocityVerlet(double dt, int iter, FILE *fp)
+{
+
+    double psum = 0.;
+    double* psum_dev , m_dev , L_dev;
+    FILE* fp_dev;
+    char* atype_dev;
+
+    cudaMalloc( (void**)&psum_dev, sizeof(double ));
+    cudaMalloc( (void**)&m_dev, sizeof(double ));
+    cudaMalloc( (void**)&L_dev, sizeof(double ));
+    cudaMalloc( (void**)&fp_dev, sizeof(FILE));
+    cudaMalloc( (void**)&fp_dev, sizeof(FILE));
+    cudaMalloc( (void**)&atype_dev, 10*sizeof(char));
+    cudaMemcpy(psum_dev, psum, sizeof (double ), cudaMemcpyHostToDevice);
+    cudaMemcpy(m_dev, m, sizeof (double ), cudaMemcpyHostToDevice);
+    cudaMemcpy(L_dev, L, sizeof (double ), cudaMemcpyHostToDevice);
+    cudaMemcpy(fp_dev, fp , sizeof (double ), cudaMemcpyHostToDevice);
+    cudaMemcpy(atype_dev, atype , 10 * sizeof (char ), cudaMemcpyHostToDevice);
+
+    // LOOP 1 : PREPARATION
+    //  Compute accelerations from forces at current position
+    computeAccelerations();
+    int grid_size_int=1;
+    dim3 grid_size(grid_size_int); //1 BLOCK
+    dim3 block_size(NUMTHREADS); // 8 THREADS IN THE BLOCK
+
+    int rva_sizes=  (3 * MAXPART) * sizeof(int );
+    double* r_dev , v_dev , a_dev;
+    double dt_dev;
+
+    // Copy the partail sums content to partial sums_dev
+    cudaMalloc( (void**)&r_dev, rva_sizes);
+    cudaMalloc( (void**)&v_dev, rva_sizes);
+    cudaMalloc( (void**)&a_dev, rva_sizes);
+    cudaMalloc( (void**)&dt_dev, sizeof(double ));
+    cudaMemcpy(r_dev, r, rva_sizes, cudaMemcpyHostToDevice);
+    cudaMemcpy(v_dev, v, rva_sizes, cudaMemcpyHostToDevice);
+    cudaMemcpy(a_dev, a, rva_sizes, cudaMemcpyHostToDevice);
+    cudaMemcpy(dt_dev, dt, sizeof(double), cudaMemcpyHostToDevice);
+
+    // LOOP 1 : EXECUTION OF THE ROUTINE
+
+    VelocityVerletRoutineLoop1<<<grid_size,block_size>>>(r_dev , v_dev , a_dev , dt_dev);
+
+    // LOOP 1 :GET THE RESULTS
+    cudaMemcpy(r, r_dev, rva_sizes , cudaMemcpyDeviceToHost);
+    cudaMemcpy(v, v_dev, rva_sizes , cudaMemcpyDeviceToHost);
+    cudaMemcpy(a, a_dev, rva_sizes , cudaMemcpyDeviceToHost);
+    // the value of dt wasn't changed
+//    cudaMemcpy(dt, dt_dev, rva_sizes , cudaMemcpyDeviceToHost);
+
+    computeAccelerations();
+    // LOOP 2 : PREPARATION
+    cudaMemcpy(r_dev, r, rva_sizes, cudaMemcpyHostToDevice);
+    cudaMemcpy(v_dev, v, rva_sizes, cudaMemcpyHostToDevice);
+    cudaMemcpy(a_dev, a, rva_sizes, cudaMemcpyHostToDevice);
+    cudaMemcpy(dt_dev, dt, sizeof(double), cudaMemcpyHostToDevice);
+
+    // LOOP 2 : EXECUTION OF THE ROUTINE
+    VelocityVerletRoutineLoop2<<<grid_size,block_size>>>(r_dev , v_dev , a_dev , dt_dev);
+
+    // LOOP 2 :GET THE RESULTS
+    cudaMemcpy(r, r_dev, rva_sizes , cudaMemcpyDeviceToHost);
+    cudaMemcpy(v, v_dev, rva_sizes , cudaMemcpyDeviceToHost);
+    cudaMemcpy(a, a_dev, rva_sizes , cudaMemcpyDeviceToHost);
+    //  Update positions and velocity with current velocity and acceleration
+    // printf("  Updated Positions!\n");
+
+    //  Update accellerations from updated positions
+    computeAccelerations();
+
+
+    // LOOP 3 : PREPARATION
+    cudaMemcpy(r_dev, r, rva_sizes, cudaMemcpyHostToDevice);
+    cudaMemcpy(v_dev, v, rva_sizes, cudaMemcpyHostToDevice);
+    cudaMemcpy(a_dev, a, rva_sizes, cudaMemcpyHostToDevice);
+    cudaMemcpy(dt_dev, dt, sizeof(double), cudaMemcpyHostToDevice);
+
+    // LOOP 3 : EXECUTION OF THE ROUTINE
+    VelocityVerletRoutineLoop3<<<grid_size,block_size>>>(r_dev , v_dev , a_dev , dt_dev , psum_dev , m_dev , L_dev);
+
+    // LOOP 3  :GET THE RESULTS
+    cudaMemcpy(r, r_dev, rva_sizes , cudaMemcpyDeviceToHost);
+    cudaMemcpy(v, v_dev, rva_sizes , cudaMemcpyDeviceToHost);
+    cudaMemcpy(a, a_dev, rva_sizes , cudaMemcpyDeviceToHost);
+    cudaMemcpy(psum, psum_dev, sizeof (double), cudaMemcpyDeviceToHost);
+
+    // LOOP 4 : Preparation ( ALready done in the start )
+
+    // LOOP 4 : EXECUTION OF THE ROUTINE
+    VelocityVerletRoutineLoop4<<<grid_size,block_size>>>(r_dev , fp_dev , atype_dev );
+    // LOOP 4  :GET THE RESULTS
+    cudaMemcpy(fp, fp_dev, sizeof (FILE), cudaMemcpyDeviceToHost);
+
     // fprintf(fp,"\n \n");
 
     return psum / (6 * L * L);
