@@ -33,6 +33,7 @@
 #define NUMTHREADS 4
 
 // timing variables
+double start_simulation, end_simulation;
 double start, end, time_used;
 
 // Number of particles
@@ -274,6 +275,7 @@ int main()
     //     NumTime = 20;
     // }
     NumTime = 400;
+    start_simulation = omp_get_wtime();
 
     //  Put all the atoms in simple crystal lattice and give them random velocities
     //  that corresponds to the initial temperature we have specified
@@ -376,8 +378,9 @@ int main()
         }
     }
 
-    end =
-        printf("Execution time the simulation is %f\n", time_used);
+    end_simulation = omp_get_wtime();
+
+    printf("Execution time the simulation is %f\n", end_simulation - start_simulation);
 
     // Because we have calculated the instantaneous temperature and pressure,
     // we can take the average over the whole simulation here
@@ -469,18 +472,17 @@ double MeanSquaredVelocity()
     double v2;
 #pragma omp parallel shared(v)
     {
-#pragma omp for reduce(+        \
-                       : vx2, + \
-                       : vy2, + \
-                       : vz2)
-        {
-            for (int i = 0; i < N; i++)
-            {
+#pragma omp for reduction(+                                   \
+                          : vx2) reduction(+                  \
+                                           : vy2) reduction(+ \
+                                                            : vz2)
 
-                vx2 = vx2 + v[i][0] * v[i][0];
-                vy2 = vy2 + v[i][1] * v[i][1];
-                vz2 = vz2 + v[i][2] * v[i][2];
-            }
+        for (int i = 0; i < N; i++)
+        {
+
+            vx2 = vx2 + v[i][0] * v[i][0];
+            vy2 = vy2 + v[i][1] * v[i][1];
+            vz2 = vz2 + v[i][2] * v[i][2];
         }
     }
 
