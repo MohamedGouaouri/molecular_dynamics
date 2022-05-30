@@ -812,10 +812,129 @@ double VelocityVerlet(double dt, int iter, FILE *fp)
     return psum / (6 * L * L);
 }
 
+__global__ void initializeVelocitiesgaussdistRoutine(int *v)
+{
+    int i = threadIdx.x;
+
+    int j;
+
+    // TODO: Parallalize this  loop
+
+    for (i = 0; i < N; i++)
+    {
+
+        for (j = 0; j < 3; j++)
+        {
+            //  Pull a number from a Gaussian Distribution
+            v[i][j] = gaussdist();
+        }
+    }
+   
+    
+}
+
+__global__ void initializeVelocitiesvCMPlusRoutine(int *v)
+{
+    int i = threadIdx.x;
+
+    int j;
+
+    // Vcm = sum_i^N  m*v_i/  sum_i^N  M
+    // Compute center-of-mas velocity according to the formula above
+    double vCM[3] = {0, 0, 0};
+
+    // TODO: Parallalize this  loop
+
+    for (i = 0; i < N; i++)
+    {
+        for (j = 0; j < 3; j++)
+        {
+
+            vCM[j] += m * v[i][j];
+        }
+    }
+
+    for (i = 0; i < 3; i++)
+        vCM[i] /= N * m;
+   
+    
+}
+
+__global__ void initializeVelocitiesvCMMoinRoutine(int *v)
+{
+    int i = threadIdx.x;
+
+    int j;
+
+    //  Subtract out the center-of-mass velocity from the
+    //  velocity of each particle... effectively set the
+    //  center of mass velocity to zero so that the system does
+    //  not drift in space!
+
+    // TODO: Parallalize this  loop
+
+    for (i = 0; i < N; i++)
+    {
+        for (j = 0; j < 3; j++)
+        {
+
+            v[i][j] -= vCM[j];
+        }
+    }
+
+    
+}
+
+__global__ void initializeVelocitiesvSqdSumRoutine(int *v)
+{
+    int i = threadIdx.x;
+
+    int j;
+
+    //  Now we want to scale the average velocity of the system
+    //  by a factor which is consistent with our initial temperature, Tinit
+    double vSqdSum, lambda;
+    vSqdSum = 0.;
+
+    // TODO: Parallalize this  loop
+
+    for (i = 0; i < N; i++)
+    {
+        for (j = 0; j < 3; j++)
+        {
+
+            vSqdSum += v[i][j] * v[i][j];
+        }
+    }
+    
+}
+
+__global__ void initializeVelocitiesLambdaRoutine(int *v)
+{
+    int i = threadIdx.x;
+
+    int j;
+
+    lambda = sqrt(3 * (N - 1) * Tinit / vSqdSum);
+
+    // TODO: Parallalize this  loop
+
+    for (i = 0; i < N; i++)
+    {
+        for (j = 0; j < 3; j++)
+        {
+
+            v[i][j] *= lambda;
+        }
+    }
+    
+}
+
 void initializeVelocities()
 {
 
     int i, j;
+
 
     // TODO: Parallalize this  loop
 
