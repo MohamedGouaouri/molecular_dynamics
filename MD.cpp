@@ -618,22 +618,38 @@ double Potential()
 //   Uses the derivative of the Lennard-Jones potential to calculate
 //   the forces on each atom.  Then uses a = F/m to calculate the
 //   accelleration of each atom.
-void computeAccelerations()
-{
-    int i, j, k;
-    double f, rSqd;
-    double rij[3]; // position of i relative to j
 
-    for (i = 0; i < N; i++)
-    { // set all accelerations to zero
-        for (k = 0; k < 3; k++)
+__global__ void nullifyAccsRoutine(double* a)
+{
+
+    int threadId = blockDim.x * blockIdx.x + threadIdx.x;
+    int start = (threadId * (*N) ) /  NUMTHREADS;
+    int  end = ( (threadId + 1) * (*N)) / NUMTHREADS;
+
+    for( int i = start; i <= end; i++ ) {
+        for ( int k = 0; k < 3; k++ )
         {
             a[i][k] = 0;
         }
     }
 
-    for (i = 0; i < N - 1; i++)
-    { // loop over all distinct pairs i,j
+}
+
+__global__ void calcNewAccsRoutine(double* r,double* a) {
+
+    int threadId = blockDim.x * blockIdx.x + threadIdx.x;
+    int start = (threadId * (*N) ) /  NUMTHREADS;
+    int  end = ( (threadId + 1) * (*N)) / NUMTHREADS;
+
+    int nbiter = 2;
+
+    int i, j, k;
+    double f, rSqd;
+    double rij[3]; // position of i relative to j
+
+    for (i = start; i < end-1; i++)
+    {
+        // loop over all distinct pairs i,j
         for (j = i + 1; j < N; j++)
         {
             // initialize r^2 to zero
@@ -642,7 +658,7 @@ void computeAccelerations()
             for (k = 0; k < 3; k++)
             {
                 //  component-by-componenent position of i relative to j
-                rij[k] = r[i][k] - r[j][k];
+                rij[k] = r[i*3+k] - r[j*3+k];
                 //  sum of squares of the components
                 rSqd += rij[k] * rij[k];
             }
@@ -657,6 +673,38 @@ void computeAccelerations()
             }
         }
     }
+    
+
+}
+
+
+
+void computeAccelerations()
+{
+    int i, j, k;
+    double f, rSqd;
+    double rij[3]; // position of i relative to j
+
+    double* a_dev;
+    double ava_sizes=  (3 * MAXPART) * sizeof(double );
+    cudaMalloc( (void**)&a_dev, ava_sizes);
+    cudaMemcpy(a_dev, &a , ava_sizes, cudaMemcpyHostToDevice);
+
+    dim3 grid_size(1); //1 BLOCK
+    dim3 block_size(NUMTHREADS); // 8 THREADS IN THE BLOCK
+
+    nullifyAccsRoutine<<<grid_size,block_size>>>(a_dev);
+
+    double* r_dev;
+    double ava_sizes=  (3 * MAXPART) * sizeof(double );
+    cudaMalloc( (void**)&r_dev, rva_sizes);
+    cudaMemcpy(r_dev, &r , rva_sizes, cudaMemcpyHostToDevice);
+
+    calcNewAccsRoutine<<<grid_size,block_size>>>(r_dev);
+
+    cudaDeviceSynchronize();
+    
+
 }
 
 __global__ void VelocityVerletRoutineLoop1(double* r , double* v , double* a  , double* dt ){
@@ -840,13 +888,9 @@ double VelocityVerlet(double dt, int iter, FILE *fp)
     return psum / (6 * L * L);
 }
 
-<<<<<<< HEAD
 
 
-void initializeVelocities()
-=======
 __global__ void initializeVelocitiesgaussdistRoutine()
->>>>>>> bc5d98b64ba672af3ff76102e55f39779a5d6820
 {
     int i = threadIdx.x;
 
