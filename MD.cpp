@@ -468,12 +468,11 @@ __global__ void potentialRoutine(double *Pot)
 
     double quot, r2, rnorm, term1, term2;
     int j, k;
-    Pot = 0.;
 
     int i = threadIdx.x;
 	// int T = blockDim.x;
 
-    for (i < N)
+    if (i < N)
     {
         for (j = 0; j < N; j++)
         {
@@ -628,6 +627,8 @@ double VelocityVerlet(double dt, int iter, FILE *fp)
 
     return psum / (6 * L * L);
 }
+
+
 
 void initializeVelocities()
 {
