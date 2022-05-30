@@ -489,7 +489,7 @@ __global__ void KineticRoutine(double * partial_kins , double* m , double* v , i
         }
         partialKin += *m * v2 / 2.;
     }
-    
+
     partial_kins[threadId] = partialKin;
 
 }
@@ -578,7 +578,7 @@ __global__ void potentialRoutine(double *Pot, int* N,double* r,double* sigma,dou
 // Function to calculate the potential energy of the system
 double Potential()
 {
-    double *dev_Pot; 
+    double *dev_Pot;
     int size = N * sizeof(double);
     cudaMalloc( (void**)&dev_Pot, size);
     double Pot = 0;
@@ -659,60 +659,60 @@ void computeAccelerations()
     }
 }
 
-__global__ void VelocityVerletRoutineLoop1(double* r , double* v , double* a  , double* dt ){
+__global__ void VelocityVerletRoutineLoop1(double* r , double* v , double* a  , double* dt , int* N ){
 
-    unsigned int threadId = blockDim.x * blockIdx.x + threadIdx.x;
-    int start = threadId * N /  NUMTHREADS;
-    int  end = (threadId + 1) * N / NUMTHREADS;
+    int threadId = blockDim.x * blockIdx.x + threadIdx.x;
+    int start = threadId * (*N) /  NUMTHREADS;
+    int  end = (threadId + 1) * (*N) / NUMTHREADS;
 
-    for (i = start; i < end; i++)
+    for (int i = start; i < end; i++)
     {
-        for (j = 0; j < 3; j++)
+        for (int j = 0; j < 3; j++)
         {
-            r[i][j] += v[i][j] * dt + 0.5 * a[i][j] * dt * dt;
+            r[i*3+j] += v[i*3+j] * (*dt) + 0.5 * a[i*3 +j] * (*dt) * (*dt);
 
-            v[i][j] += 0.5 * a[i][j] * dt;
+            v[i*3+j] += 0.5 * a[i*3+j] * (*dt);
         }
         // printf("  %i  %6.4e   %6.4e   %6.4e\n",i,r[i][0],r[i][1],r[i][2]);
     }
 
 }
 
-__global__ void VelocityVerletRoutineLoop2(double* r , double* v , double* a  , double* dt ){
+__global__ void VelocityVerletRoutineLoop2(double* r , double* v , double* a  , double* dt , int* N ){
 
-    unsigned int threadId = blockDim.x * blockIdx.x + threadIdx.x;
-    int start = threadId * N /  NUMTHREADS;
-    int  end = (threadId + 1) * N / NUMTHREADS;
+    int threadId = blockDim.x * blockIdx.x + threadIdx.x;
+    int start = threadId * (*N) /  NUMTHREADS;
+    int  end = (threadId + 1) * (*N) / NUMTHREADS;
 
-    for (i = start; i < end; i++)
+    for (int i = start; i < end; i++)
     {
-        for (j = 0; j < 3; j++)
+        for (int j = 0; j < 3; j++)
         {
-            v[i][j] += 0.5 * a[i][j] * dt;
+            v[i*3+j] += 0.5 * a[i*3+j] * (*dt);
         }
     }
 
 }
 
-__global__ void VelocityVerletRoutineLoop3(double* r , double* v , double* a  , double* dt , double* psum  , double* m , double* L){
+__global__ void VelocityVerletRoutineLoop3(double* r , double* v , double* a  , double* dt , double* psum  , double* m , double* L , int* N){
 
-    unsigned int threadId = blockDim.x * blockIdx.x + threadIdx.x;
-    int start = threadId * N /  NUMTHREADS;
-    int  end = (threadId + 1) * N / NUMTHREADS;
+    int threadId = blockDim.x * blockIdx.x + threadIdx.x;
+    int start = threadId * (*N) /  NUMTHREADS;
+    int  end = (threadId + 1) * (*N) / NUMTHREADS;
 
-    for (i = start; i < end i++)
+    for (int i = start; i < end ;  i++)
     {
-        for (j = 0; j < 3; j++)
+        for (int j = 0; j < 3; j++)
         {
-            if (r[i][j] < 0.)
+            if (r[i*3+j] < 0.)
             {
-                v[i][j] *= -1.;                     //- elastic walls
-                psum += 2 * m * fabs(v[i][j]) / dt; // contribution to pressure from "left" walls
+                v[i*3+j] *= -1.;                     //- elastic walls
+                *psum += 2 * (*m) * fabs(v[i*3+j]) / (*dt); // contribution to pressure from "left" walls
             }
-            if (r[i][j] >= L)
+            if (r[i*3+j] >= *L)
             {
-                v[i][j] *= -1.;                     //- elastic walls
-                psum += 2 * m * fabs(v[i][j]) / dt; // contribution to pressure from "right" walls
+                v[i*3+j] *= -1.;                     //- elastic walls
+                *psum += 2 * (*m) * fabs(v[i*3+j]) / (*dt); // contribution to pressure from "right" walls
             }
         }
     }
@@ -720,18 +720,18 @@ __global__ void VelocityVerletRoutineLoop3(double* r , double* v , double* a  , 
 }
 
 
-__global__ void VelocityVerletRoutineLoop4(double* r  , FILE* fp , char* atype ){
+__global__ void VelocityVerletRoutineLoop4(double* r  , FILE* fp , char* atype , int* N ){
 
-    unsigned int threadId = blockDim.x * blockIdx.x + threadIdx.x;
-    int start = threadId * N /  NUMTHREADS;
-    int  end = (threadId + 1) * N / NUMTHREADS;
+    int threadId = blockDim.x * blockIdx.x + threadIdx.x;
+    int start = threadId * (*N) /  NUMTHREADS;
+    int  end = (threadId + 1) * (*N) / NUMTHREADS;
 
-    for (i = start; i < end; i++)
+    for (int i = start; i < end; i++)
     {
         fprintf(fp, "%s", atype);
-        for (j = 0; j < 3; j++)
+        for (int j = 0; j < 3; j++)
         {
-            fprintf(fp, "  %12.10e ", r[i][j]);
+            fprintf(fp, "  %12.10e ", r[i*3+j]);
         }
         fprintf(fp, "\n");
     }
@@ -744,9 +744,10 @@ double VelocityVerlet(double dt, int iter, FILE *fp)
 {
 
     double psum = 0.;
-    double* psum_dev , m_dev , L_dev;
+    double *psum_dev , *m_dev , *L_dev;
     FILE* fp_dev;
     char* atype_dev;
+    int* N_dev;
 
     cudaMalloc( (void**)&psum_dev, sizeof(double ));
     cudaMalloc( (void**)&m_dev, sizeof(double ));
@@ -754,11 +755,13 @@ double VelocityVerlet(double dt, int iter, FILE *fp)
     cudaMalloc( (void**)&fp_dev, sizeof(FILE));
     cudaMalloc( (void**)&fp_dev, sizeof(FILE));
     cudaMalloc( (void**)&atype_dev, 10*sizeof(char));
-    cudaMemcpy(psum_dev, psum, sizeof (double ), cudaMemcpyHostToDevice);
-    cudaMemcpy(m_dev, m, sizeof (double ), cudaMemcpyHostToDevice);
-    cudaMemcpy(L_dev, L, sizeof (double ), cudaMemcpyHostToDevice);
+    cudaMalloc( (void**)&N_dev, sizeof(int));
+    cudaMemcpy(psum_dev, &psum, sizeof (double ), cudaMemcpyHostToDevice);
+    cudaMemcpy(m_dev, &m, sizeof (double ), cudaMemcpyHostToDevice);
+    cudaMemcpy(L_dev, &L, sizeof (double ), cudaMemcpyHostToDevice);
     cudaMemcpy(fp_dev, fp , sizeof (double ), cudaMemcpyHostToDevice);
     cudaMemcpy(atype_dev, atype , 10 * sizeof (char ), cudaMemcpyHostToDevice);
+    cudaMemcpy(N_dev, &N , sizeof(int) , cudaMemcpyHostToDevice);
 
     // LOOP 1 : PREPARATION
     //  Compute accelerations from forces at current position
@@ -768,8 +771,8 @@ double VelocityVerlet(double dt, int iter, FILE *fp)
     dim3 block_size(NUMTHREADS); // 8 THREADS IN THE BLOCK
 
     int rva_sizes=  (3 * MAXPART) * sizeof(int );
-    double* r_dev , v_dev , a_dev;
-    double dt_dev;
+    double *r_dev , *v_dev , *a_dev;
+    double* dt_dev;
 
     // Copy the partail sums content to partial sums_dev
     cudaMalloc( (void**)&r_dev, rva_sizes);
@@ -779,11 +782,11 @@ double VelocityVerlet(double dt, int iter, FILE *fp)
     cudaMemcpy(r_dev, r, rva_sizes, cudaMemcpyHostToDevice);
     cudaMemcpy(v_dev, v, rva_sizes, cudaMemcpyHostToDevice);
     cudaMemcpy(a_dev, a, rva_sizes, cudaMemcpyHostToDevice);
-    cudaMemcpy(dt_dev, dt, sizeof(double), cudaMemcpyHostToDevice);
+    cudaMemcpy(dt_dev, &dt, sizeof(double), cudaMemcpyHostToDevice);
 
     // LOOP 1 : EXECUTION OF THE ROUTINE
 
-    VelocityVerletRoutineLoop1<<<grid_size,block_size>>>(r_dev , v_dev , a_dev , dt_dev);
+    VelocityVerletRoutineLoop1<<<grid_size,block_size>>>(r_dev , v_dev , a_dev , dt_dev , N_dev);
 
     // LOOP 1 :GET THE RESULTS
     cudaMemcpy(r, r_dev, rva_sizes , cudaMemcpyDeviceToHost);
@@ -797,10 +800,10 @@ double VelocityVerlet(double dt, int iter, FILE *fp)
     cudaMemcpy(r_dev, r, rva_sizes, cudaMemcpyHostToDevice);
     cudaMemcpy(v_dev, v, rva_sizes, cudaMemcpyHostToDevice);
     cudaMemcpy(a_dev, a, rva_sizes, cudaMemcpyHostToDevice);
-    cudaMemcpy(dt_dev, dt, sizeof(double), cudaMemcpyHostToDevice);
+    cudaMemcpy(dt_dev, &dt, sizeof(double), cudaMemcpyHostToDevice);
 
     // LOOP 2 : EXECUTION OF THE ROUTINE
-    VelocityVerletRoutineLoop2<<<grid_size,block_size>>>(r_dev , v_dev , a_dev , dt_dev);
+    VelocityVerletRoutineLoop2<<<grid_size,block_size>>>(r_dev , v_dev , a_dev , dt_dev , N_dev);
 
     // LOOP 2 :GET THE RESULTS
     cudaMemcpy(r, r_dev, rva_sizes , cudaMemcpyDeviceToHost);
@@ -817,21 +820,21 @@ double VelocityVerlet(double dt, int iter, FILE *fp)
     cudaMemcpy(r_dev, r, rva_sizes, cudaMemcpyHostToDevice);
     cudaMemcpy(v_dev, v, rva_sizes, cudaMemcpyHostToDevice);
     cudaMemcpy(a_dev, a, rva_sizes, cudaMemcpyHostToDevice);
-    cudaMemcpy(dt_dev, dt, sizeof(double), cudaMemcpyHostToDevice);
+    cudaMemcpy(dt_dev, &dt, sizeof(double), cudaMemcpyHostToDevice);
 
     // LOOP 3 : EXECUTION OF THE ROUTINE
-    VelocityVerletRoutineLoop3<<<grid_size,block_size>>>(r_dev , v_dev , a_dev , dt_dev , psum_dev , m_dev , L_dev);
+    VelocityVerletRoutineLoop3<<<grid_size,block_size>>>(r_dev , v_dev , a_dev , dt_dev , psum_dev , m_dev , L_dev , N_dev);
 
     // LOOP 3  :GET THE RESULTS
     cudaMemcpy(r, r_dev, rva_sizes , cudaMemcpyDeviceToHost);
     cudaMemcpy(v, v_dev, rva_sizes , cudaMemcpyDeviceToHost);
     cudaMemcpy(a, a_dev, rva_sizes , cudaMemcpyDeviceToHost);
-    cudaMemcpy(psum, psum_dev, sizeof (double), cudaMemcpyDeviceToHost);
+    cudaMemcpy(&psum, psum_dev, sizeof (double), cudaMemcpyDeviceToHost);
 
     // LOOP 4 : Preparation ( ALready done in the start )
 
     // LOOP 4 : EXECUTION OF THE ROUTINE
-    VelocityVerletRoutineLoop4<<<grid_size,block_size>>>(r_dev , fp_dev , atype_dev );
+    VelocityVerletRoutineLoop4<<<grid_size,block_size>>>(r_dev , fp_dev , atype_dev , N_dev);
     // LOOP 4  :GET THE RESULTS
     cudaMemcpy(fp, fp_dev, sizeof (FILE), cudaMemcpyDeviceToHost);
 
@@ -840,31 +843,31 @@ double VelocityVerlet(double dt, int iter, FILE *fp)
     return psum / (6 * L * L);
 }
 
-<<<<<<< HEAD
+// <<<<<<< HEAD
 
 
-void initializeVelocities()
-=======
+// void initializeVelocities()
+// =======
 __global__ void initializeVelocitiesgaussdistRoutine()
->>>>>>> bc5d98b64ba672af3ff76102e55f39779a5d6820
+// >>>>>>> bc5d98b64ba672af3ff76102e55f39779a5d6820
 {
     int i = threadIdx.x;
 
     int j;
 
-    // TODO: Parallalize this  loop
+// TODO: Parallalize this  loop
 
     if (i < N)
     {
 
         for (j = 0; j < 3; j++)
         {
-            //  Pull a number from a Gaussian Distribution
+//  Pull a number from a Gaussian Distribution
             v[i][j] = gaussdist();
         }
     }
-   
-    
+
+
 }
 
 __global__ void initializeVelocitiesvCMPlusRoutine(double *vCM[3])
@@ -890,7 +893,7 @@ __global__ void initializeVelocitiesvCMPlusRoutine(double *vCM[3])
 
     for (i = 0; i < 3; i++)
         vCM[i] /= N * m;
- 
+
 }
 
 __global__ void initializeVelocitiesvCMMoinRoutine(double *vCM[3])
@@ -915,7 +918,7 @@ __global__ void initializeVelocitiesvCMMoinRoutine(double *vCM[3])
         }
     }
 
-    
+
 }
 
 __global__ void initializeVelocitiesvSqdSumRoutine(double *vSqdSum)
@@ -938,7 +941,7 @@ __global__ void initializeVelocitiesvSqdSumRoutine(double *vSqdSum)
             vSqdSum += v[i][j] * v[i][j];
         }
     }
-    
+
 }
 
 __global__ void initializeVelocitiesLambdaRoutine(double *lambda,double vSqdSum)
@@ -959,7 +962,7 @@ __global__ void initializeVelocitiesLambdaRoutine(double *lambda,double vSqdSum)
             v[i][j] *= lambda;
         }
     }
-    
+
 }
 
 void initializeVelocities()
