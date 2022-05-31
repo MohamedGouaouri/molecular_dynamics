@@ -619,17 +619,17 @@ double Potential()
 //   the forces on each atom.  Then uses a = F/m to calculate the
 //   accelleration of each atom.
 
-__global__ void nullifyAccsRoutine(double *a)
+__global__ void nullifyAccsRoutine(double *a,int* N)
 {
 
     int threadId = blockDim.x * blockIdx.x + threadIdx.x;
-    int start = (threadId * (N) ) /  NUMTHREADS;
-    int  end = ( (threadId + 1) * (N)) / NUMTHREADS;
+    int start = (threadId * (*N) ) /  NUMTHREADS;
+    int  end = ( (threadId + 1) * (*N)) / NUMTHREADS;
 
     for( int i = start; i <= end; i++ ) {
         for ( int k = 0; k < 3; k++ )
         {
-            *a[i][k] = 0;
+            a[i*3+k] = 0;
         }
     }
 
@@ -648,7 +648,7 @@ __global__ void calcNewAccsRoutine(double* r,double* a,int* N) {
     for (i = start; i < end-1; i++)
     {
         // loop over all distinct pairs i,j
-        for (j = i + 1; j < N; j++)
+        for (j = i + 1; j < *N; j++)
         {
             // initialize r^2 to zero
             rSqd = 0;
@@ -666,8 +666,8 @@ __global__ void calcNewAccsRoutine(double* r,double* a,int* N) {
             for (k = 0; k < 3; k++)
             {
                 //  from F = ma, where m = 1 in natural units!
-                a[i][k] += rij[k] * f;
-                a[j][k] -= rij[k] * f;
+                a[i*3+k] += rij[k] * f;
+                a[j*3+k] -= rij[k] * f;
             }
         }
     }
@@ -679,9 +679,6 @@ __global__ void calcNewAccsRoutine(double* r,double* a,int* N) {
 
 void computeAccelerations()
 {
-    int i, j, k;
-    double f, rSqd;
-    double rij[3]; // position of i relative to j
     double ava_sizes=  (3 * MAXPART) * sizeof(double );
     
     dim3 grid_size(1); //1 BLOCK
@@ -690,17 +687,20 @@ void computeAccelerations()
     double* a_dev;
     cudaMalloc( (void**)&a_dev, ava_sizes);
     cudaMemcpy(a_dev, &a , ava_sizes, cudaMemcpyHostToDevice);
+    
+    int* N_dev;
+    cudaMalloc( (void**)&N_dev, sizeof(int ));
+    cudaMemcpy(N_dev, &N , sizeof (int ), cudaMemcpyHostToDevice);
+
+    nullifyAccsRoutine<<<grid_size,block_size>>>(a_dev,N_dev);
 
     cudaFree( a_dev );
-
-
-    nullifyAccsRoutine<<<grid_size,block_size>>>(a_dev);
+    cudaFree( N_dev );
 
     double* r_dev;
-    cudaMalloc( (void**)&r_dev, rva_sizes);
-    cudaMemcpy(r_dev, &r , rva_sizes, cudaMemcpyHostToDevice);
+    cudaMalloc( (void**)&r_dev, ava_sizes);
+    cudaMemcpy(r_dev, &r , ava_sizes, cudaMemcpyHostToDevice);
 
-    int* N_dev;
     cudaMalloc( (void**)&N_dev, sizeof(int ));
     cudaMemcpy(N_dev, &N , sizeof (int ), cudaMemcpyHostToDevice);
 
@@ -712,8 +712,6 @@ void computeAccelerations()
 
     cudaDeviceSynchronize();
 
-    cudaMemcpy( &Pot, dev_Pot, size, cudaMemcpyDeviceToHost);
-    
 
 }
 
