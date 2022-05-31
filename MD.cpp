@@ -368,30 +368,25 @@ int main()
 }
 
 
-__global__ void initializeRoutine(int *p)
+__global__ void initializeRoutine(int *p,int n,double pos)
 {
-    int i = threadIdx.x;
+    int threadId = blockDim.x * blockIdx.x + threadIdx.x;
+    int start = (threadId * (n) ) /  NUMTHREADS;
+    int  end = ( (threadId + 1) * (n)) / NUMTHREADS;
 
-    int n, j, k;
-    double pos;
-
-    // Number of atoms in each direction
-    n = int(ceil(pow(N, 1.0 / 3)));
-
-    //  spacing between atoms along a given direction
-    pos = L / n;
+    int i,j, k;
 
     //  index for number of particles assigned positions
     p = 0;
     //  initialize positions
 
-    if( i < n )
+    for (i = start; i < end ; i++)
     {
         for (j = 0; j < n; j++)
         {
             for (k = 0; k < n; k++)
             {
-                if (p < N)
+                if (*p < N)
                 {
 
                     r[p][0] = (i + 0.5) * pos;
@@ -406,29 +401,36 @@ __global__ void initializeRoutine(int *p)
 
 void initialize()
 {
-    int *p_th;
+     int n, j, k;
+    double pos;
 
+    int *p_th;
     int p;
 
     int size = N * sizeof(double);
 
     cudaMalloc( (void**)&p_th, size);
 
+    // Number of atoms in each direction
+    n = int(ceil(pow(N, 1.0 / 3)));
+
+    //  spacing between atoms along a given direction
+    pos = L / n;
+
     //  index for number of particles assigned positions
     p = 0;
 
-    cudaMemcpy( p_th, p, size, cudaMemcpyHostToDevice);
+    cudaMemcpy( p_th, &p, size, cudaMemcpyHostToDevice);
 
     dim3 grid_size(1); //1 BLOCK
-    dim3 block_size(NUMTHREADS) // 8 THREADS IN THE BLOCK
+    dim3 block_size(NUMTHREADS); // 8 THREADS IN THE BLOCK
 
-    initializeRoutine<<<grid_size,block_size>>>(p_th);
+    initializeRoutine<<<grid_size,block_size>>>(p_th,n,pos);
 
     cudaDeviceSynchronize();
 
-    cudaMemcpy( p, p_th, size, cudaMemcpyDeviceToHost);
+    cudaMemcpy( &p, p_th, size, cudaMemcpyDeviceToHost);
 
-    free( p );
     cudaFree( p_th );
 
     // Call function to initialize velocities
@@ -905,13 +907,15 @@ double VelocityVerlet(double dt, int iter, FILE *fp)
 __global__ void initializeVelocitiesgaussdistRoutine()
 //>>>>>>> b7eac01ae33bac39cafccc0b8fd033e66d228f30
 {
-    int i = threadIdx.x;
+    int threadId = blockDim.x * blockIdx.x + threadIdx.x;
+    int start = (threadId * (N) ) /  NUMTHREADS;
+    int  end = ( (threadId + 1) * (N)) / NUMTHREADS;
 
     int j;
 
 // TODO: Parallalize this  loop
 
-    if (i < N)
+    for (int i = start; i < end ; i++)
     {
 
         for (j = 0; j < 3; j++)
@@ -926,33 +930,34 @@ __global__ void initializeVelocitiesgaussdistRoutine()
 
 __global__ void initializeVelocitiesvCMPlusRoutine(double *vCM[3])
 {
-    int i = threadIdx.x;
+=
+    int threadId = blockDim.x * blockIdx.x + threadIdx.x;
+    int start = (threadId * (N) ) /  NUMTHREADS;
+    int  end = ( (threadId + 1) * (N)) / NUMTHREADS;
 
     int j;
 
-    // Vcm = sum_i^N  m*v_i/  sum_i^N  M
-    // Compute center-of-mas velocity according to the formula above
-    vCM[3] = {0, 0, 0};
-
     // TODO: Parallalize this  loop
 
-    if (i < N)
+    for (int i = start; i < end ; i++)
     {
         for (j = 0; j < 3; j++)
         {
 
-            vCM[j] += m * v[i][j];
+            *vCM[j] += m * v[i][j];
         }
     }
 
     for (i = 0; i < 3; i++)
-        vCM[i] /= N * m;
+        *vCM[i] /= N * m;
 
 }
 
 __global__ void initializeVelocitiesvCMMoinRoutine(double *vCM[3])
 {
-    int i = threadIdx.x;
+    int threadId = blockDim.x * blockIdx.x + threadIdx.x;
+    int start = (threadId * (N) ) /  NUMTHREADS;
+    int  end = ( (threadId + 1) * (N)) / NUMTHREADS;
 
     int j;
 
@@ -963,12 +968,12 @@ __global__ void initializeVelocitiesvCMMoinRoutine(double *vCM[3])
 
     // TODO: Parallalize this  loop
 
-    if (i < N)
+    for (int i = start; i < end ; i++)
     {
         for (j = 0; j < 3; j++)
         {
 
-            v[i][j] -= vCM[j];
+            v[i][j] -= *vCM[j];
         }
     }
 
@@ -977,43 +982,45 @@ __global__ void initializeVelocitiesvCMMoinRoutine(double *vCM[3])
 
 __global__ void initializeVelocitiesvSqdSumRoutine(double *vSqdSum)
 {
-    int i = threadIdx.x;
+    int threadId = blockDim.x * blockIdx.x + threadIdx.x;
+    int start = (threadId * (N) ) /  NUMTHREADS;
+    int  end = ( (threadId + 1) * (N)) / NUMTHREADS;
 
     int j;
 
     //  Now we want to scale the average velocity of the system
     //  by a factor which is consistent with our initial temperature, Tinit
-    vSqdSum = 0.;
 
     // TODO: Parallalize this  loop
 
-    if (i < N)
+    for (int i = start; i < end ; i++)
     {
         for (j = 0; j < 3; j++)
         {
 
-            vSqdSum += v[i][j] * v[i][j];
+            *vSqdSum += v[i][j] * v[i][j];
         }
     }
 
 }
 
-__global__ void initializeVelocitiesLambdaRoutine(double *lambda,double vSqdSum)
+__global__ void initializeVelocitiesLambdaRoutine(double *lambda)
 {
-    int i = threadIdx.x;
-
+    int threadId = blockDim.x * blockIdx.x + threadIdx.x;
+    int start = (threadId * (N) ) /  NUMTHREADS;
+    int  end = ( (threadId + 1) * (N)) / NUMTHREADS;
+    
     int j;
 
-    lambda = sqrt(3 * (N - 1) * Tinit / vSqdSum);
 
     // TODO: Parallalize this  loop
 
-    if (i < N)
+    for (int i = start; i < end ; i++)
     {
         for (j = 0; j < 3; j++)
         {
 
-            v[i][j] *= lambda;
+            v[i][j] *= *lambda;
         }
     }
 
@@ -1042,7 +1049,7 @@ void initializeVelocities()
     cudaMalloc( (void**)&vCM_th, size);
 
 
-    cudaMemcpy( vCM_th, vCM, size, cudaMemcpyHostToDevice);
+    cudaMemcpy( vCM_th, &vCM, size, cudaMemcpyHostToDevice);
 
     dim3 grid_size(1); //1 BLOCK
     dim3 block_size(NUMTHREADS) // 8 THREADS IN THE BLOCK
@@ -1063,9 +1070,8 @@ void initializeVelocities()
 
     cudaDeviceSynchronize();
 
-    cudaMemcpy( vCM, vCM_th, size, cudaMemcpyDeviceToHost);
+    cudaMemcpy( &vCM, vCM_th, size, cudaMemcpyDeviceToHost);
 
-    free( vCM );
     cudaFree( vCM_th );
 
 
@@ -1079,7 +1085,7 @@ void initializeVelocities()
     cudaMalloc( (void**)&vSqdSum_th, size);
 
 
-    cudaMemcpy( vSqdSum_th, vSqdSum, size, cudaMemcpyHostToDevice);
+    cudaMemcpy( vSqdSum_th, &vSqdSum, size, cudaMemcpyHostToDevice);
 
     dim3 grid_size(1); //1 BLOCK
     dim3 block_size(NUMTHREADS) // 8 THREADS IN THE BLOCK
@@ -1088,9 +1094,8 @@ void initializeVelocities()
 
     cudaDeviceSynchronize();
 
-    cudaMemcpy( vSqdSum, vSqdSum_th, size, cudaMemcpyDeviceToHost);
+    cudaMemcpy( &vSqdSum, vSqdSum_th, size, cudaMemcpyDeviceToHost);
 
-    free( vSqdSum );
     cudaFree( vSqdSum_th );
 
 
@@ -1103,18 +1108,17 @@ void initializeVelocities()
     cudaMalloc( (void**)&lambda_th, size);
 
 
-    cudaMemcpy( lambda_th, lambda, size, cudaMemcpyHostToDevice);
+    cudaMemcpy( lambda_th, &lambda, size, cudaMemcpyHostToDevice);
 
     dim3 grid_size(1); //1 BLOCK
     dim3 block_size(NUMTHREADS) // 8 THREADS IN THE BLOCK
 
-    initializeVelocitiesLambdaRoutine<<<grid_size,block_size>>>(lambda_th,vSqdSum);
+    initializeVelocitiesLambdaRoutine<<<grid_size,block_size>>>(lambda_th);
 
     cudaDeviceSynchronize();
 
-    cudaMemcpy( lambda, lambda_th, size, cudaMemcpyDeviceToHost);
+    cudaMemcpy( &lambda, lambda_th, size, cudaMemcpyDeviceToHost);
 
-    free( lambda );
     cudaFree( lambda_th );
 
 }
