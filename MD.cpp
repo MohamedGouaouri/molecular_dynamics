@@ -376,8 +376,6 @@ __global__ void initializeRoutine(int *p,int n,double pos)
 
     int i,j, k;
 
-    //  index for number of particles assigned positions
-    p = 0;
     //  initialize positions
 
     for (i = start; i < end ; i++)
@@ -389,9 +387,9 @@ __global__ void initializeRoutine(int *p,int n,double pos)
                 if (*p < N)
                 {
 
-                    r[p][0] = (i + 0.5) * pos;
-                    r[p][1] = (j + 0.5) * pos;
-                    r[p][2] = (k + 0.5) * pos;
+                    r[*p][0] = (i + 0.5) * pos;
+                    r[*p][1] = (j + 0.5) * pos;
+                    r[*p][2] = (k + 0.5) * pos;
                 }
                 p++;
             }
@@ -621,17 +619,17 @@ double Potential()
 //   the forces on each atom.  Then uses a = F/m to calculate the
 //   accelleration of each atom.
 
-__global__ void nullifyAccsRoutine(double* a)
+__global__ void nullifyAccsRoutine(double *a)
 {
 
     int threadId = blockDim.x * blockIdx.x + threadIdx.x;
-    int start = (threadId * (*N) ) /  NUMTHREADS;
-    int  end = ( (threadId + 1) * (*N)) / NUMTHREADS;
+    int start = (threadId * (N) ) /  NUMTHREADS;
+    int  end = ( (threadId + 1) * (N)) / NUMTHREADS;
 
     for( int i = start; i <= end; i++ ) {
         for ( int k = 0; k < 3; k++ )
         {
-            a[i][k] = 0;
+            *a[i][k] = 0;
         }
     }
 
@@ -930,7 +928,7 @@ __global__ void initializeVelocitiesgaussdistRoutine()
 
 __global__ void initializeVelocitiesvCMPlusRoutine(double *vCM[3])
 {
-=
+
     int threadId = blockDim.x * blockIdx.x + threadIdx.x;
     int start = (threadId * (N) ) /  NUMTHREADS;
     int  end = ( (threadId + 1) * (N)) / NUMTHREADS;
@@ -948,9 +946,9 @@ __global__ void initializeVelocitiesvCMPlusRoutine(double *vCM[3])
         }
     }
 
-    for (i = 0; i < 3; i++)
+    for (int i = 0; i < 3; i++){
         *vCM[i] /= N * m;
-
+    }
 }
 
 __global__ void initializeVelocitiesvCMMoinRoutine(double *vCM[3])
@@ -1051,9 +1049,6 @@ void initializeVelocities()
 
     cudaMemcpy( vCM_th, &vCM, size, cudaMemcpyHostToDevice);
 
-    dim3 grid_size(1); //1 BLOCK
-    dim3 block_size(NUMTHREADS) // 8 THREADS IN THE BLOCK
-
     initializeVelocitiesvCMPlusRoutine<<<grid_size,block_size>>>(vCM_th);
 
     cudaDeviceSynchronize();
@@ -1062,9 +1057,6 @@ void initializeVelocities()
     //  velocity of each particle... effectively set the
     //  center of mass velocity to zero so that the system does
     //  not drift in space!
-
-    dim3 grid_size(1); //1 BLOCK
-    dim3 block_size(NUMTHREADS) // 8 THREADS IN THE BLOCK
 
     initializeVelocitiesvCMMoinRoutine<<<grid_size,block_size>>>(vCM_th);
 
@@ -1080,15 +1072,12 @@ void initializeVelocities()
     double vSqdSum = 0.;
     double *vSqdSum_th ;
 
-    int size = N * sizeof(double);
+    size = N * sizeof(double);
 
     cudaMalloc( (void**)&vSqdSum_th, size);
 
 
     cudaMemcpy( vSqdSum_th, &vSqdSum, size, cudaMemcpyHostToDevice);
-
-    dim3 grid_size(1); //1 BLOCK
-    dim3 block_size(NUMTHREADS) // 8 THREADS IN THE BLOCK
 
     initializeVelocitiesvSqdSumRoutine<<<grid_size,block_size>>>(vSqdSum_th);
 
@@ -1103,15 +1092,12 @@ void initializeVelocities()
 
     double *lambda_th;
 
-    int size = N * sizeof(double);
+    size = N * sizeof(double);
 
     cudaMalloc( (void**)&lambda_th, size);
 
 
     cudaMemcpy( lambda_th, &lambda, size, cudaMemcpyHostToDevice);
-
-    dim3 grid_size(1); //1 BLOCK
-    dim3 block_size(NUMTHREADS) // 8 THREADS IN THE BLOCK
 
     initializeVelocitiesLambdaRoutine<<<grid_size,block_size>>>(lambda_th);
 
