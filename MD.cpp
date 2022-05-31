@@ -635,13 +635,11 @@ __global__ void nullifyAccsRoutine(double* a)
 
 }
 
-__global__ void calcNewAccsRoutine(double* r,double* a) {
+__global__ void calcNewAccsRoutine(double* r,double* a,int* N) {
 
     int threadId = blockDim.x * blockIdx.x + threadIdx.x;
     int start = (threadId * (*N) ) /  NUMTHREADS;
     int  end = ( (threadId + 1) * (*N)) / NUMTHREADS;
-
-    int nbiter = 2;
 
     int i, j, k;
     double f, rSqd;
@@ -684,25 +682,37 @@ void computeAccelerations()
     int i, j, k;
     double f, rSqd;
     double rij[3]; // position of i relative to j
+    double ava_sizes=  (3 * MAXPART) * sizeof(double );
+    
+    dim3 grid_size(1); //1 BLOCK
+    dim3 block_size(NUMTHREADS); // 8 THREADS IN THE BLOCK
 
     double* a_dev;
-    double ava_sizes=  (3 * MAXPART) * sizeof(double );
     cudaMalloc( (void**)&a_dev, ava_sizes);
     cudaMemcpy(a_dev, &a , ava_sizes, cudaMemcpyHostToDevice);
 
-    dim3 grid_size(1); //1 BLOCK
-    dim3 block_size(NUMTHREADS); // 8 THREADS IN THE BLOCK
+    cudaFree( a_dev );
+
 
     nullifyAccsRoutine<<<grid_size,block_size>>>(a_dev);
 
     double* r_dev;
-    double ava_sizes=  (3 * MAXPART) * sizeof(double );
     cudaMalloc( (void**)&r_dev, rva_sizes);
     cudaMemcpy(r_dev, &r , rva_sizes, cudaMemcpyHostToDevice);
 
-    calcNewAccsRoutine<<<grid_size,block_size>>>(r_dev);
+    int* N_dev;
+    cudaMalloc( (void**)&N_dev, sizeof(int ));
+    cudaMemcpy(N_dev, &N , sizeof (int ), cudaMemcpyHostToDevice);
+
+    double* aa_dev;
+    cudaMalloc( (void**)&aa_dev, ava_sizes);
+    cudaMemcpy(aa_dev, &a , ava_sizes, cudaMemcpyHostToDevice);
+
+    calcNewAccsRoutine<<<grid_size,block_size>>>(r_dev,aa_dev,N_dev);
 
     cudaDeviceSynchronize();
+
+    cudaMemcpy( &Pot, dev_Pot, size, cudaMemcpyDeviceToHost);
     
 
 }
