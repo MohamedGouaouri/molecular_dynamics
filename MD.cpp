@@ -414,7 +414,7 @@ void initialize()
 
     int sizedoublearray = (3 * MAXPART) * sizeof(double );
 
-     // Number of atoms in each direction
+    // Number of atoms in each direction
     n = int(ceil(pow(N, 1.0 / 3)));
 
     //  spacing between atoms along a given direction
@@ -698,7 +698,7 @@ __global__ void calcNewAccsRoutine(double* r,double* a,int* N) {
             }
         }
     }
-    
+
 
 }
 
@@ -707,14 +707,14 @@ __global__ void calcNewAccsRoutine(double* r,double* a,int* N) {
 void computeAccelerations()
 {
     double ava_sizes=  (3 * MAXPART) * sizeof(double );
-    
+
     dim3 grid_size(1); //1 BLOCK
     dim3 block_size(NUMTHREADS); // 8 THREADS IN THE BLOCK
 
     double* a_dev;
     cudaMalloc( (void**)&a_dev, ava_sizes);
     cudaMemcpy(a_dev, &a , ava_sizes, cudaMemcpyHostToDevice);
-    
+
     int* N_dev;
     cudaMalloc( (void**)&N_dev, sizeof(int ));
     cudaMemcpy(N_dev, &N , sizeof (int ), cudaMemcpyHostToDevice);
@@ -803,23 +803,6 @@ __global__ void VelocityVerletRoutineLoop3(double* r , double* v , double* a  , 
 }
 
 
-__global__ void VelocityVerletRoutineLoop4(double* r  , FILE* fp , char* atype , int* N ){
-
-    int threadId = blockDim.x * blockIdx.x + threadIdx.x;
-    int start = threadId * (*N) /  NUMTHREADS;
-    int  end = (threadId + 1) * (*N) / NUMTHREADS;
-
-    for (int i = start; i < end; i++)
-    {
-        fprintf(fp, "%s", atype);
-        for (int j = 0; j < 3; j++)
-        {
-            fprintf(fp, "  %12.10e ", r[i*3+j]);
-        }
-        fprintf(fp, "\n");
-    }
-
-}
 
 
 // returns sum of dv/dt*m/A (aka Pressure) from elastic collisions with walls
@@ -914,12 +897,18 @@ double VelocityVerlet(double dt, int iter, FILE *fp)
     cudaMemcpy(a, a_dev, rva_sizes , cudaMemcpyDeviceToHost);
     cudaMemcpy(&psum, psum_dev, sizeof (double), cudaMemcpyDeviceToHost);
 
-    // LOOP 4 : Preparation ( ALready done in the start )
+    // LOOP 4 : CANNOT BE PARALALIZED DUE TO FPRINTF FUNCTION
 
-    // LOOP 4 : EXECUTION OF THE ROUTINE
-    VelocityVerletRoutineLoop4<<<grid_size,block_size>>>(r_dev , fp_dev , atype_dev , N_dev);
-    // LOOP 4  :GET THE RESULTS
-    cudaMemcpy(fp, fp_dev, sizeof (FILE), cudaMemcpyDeviceToHost);
+    for (int i = 0; i < N; i++)
+    {
+        fprintf(fp, "%s", atype);
+        for (int j = 0; j < 3; j++)
+        {
+            fprintf(fp, "  %12.10e ", r[i*3+j]);
+        }
+        fprintf(fp, "\n");
+    }
+
 
     // fprintf(fp,"\n \n");
 
@@ -1071,7 +1060,7 @@ __global__ void initializeVelocitiesLambdaRoutine(double *lambda,double *v[MAXPA
     int threadId = blockDim.x * blockIdx.x + threadIdx.x;
     int start = (threadId * (*N) ) /  NUMTHREADS;
     int  end = ( (threadId + 1) * (*N)) / NUMTHREADS;
-    
+
     int j;
 
 
