@@ -27,6 +27,8 @@
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
+#include <curand_kernel.h>
+#include <curand.h>
 
 #define NUMTHREADS 8
 // Number of particles
@@ -927,41 +929,17 @@ double VelocityVerlet(double dt, int iter, FILE *fp)
 
 //  Numerical recipes Gaussian distribution number generator
 
-double gaussdist()
-{
-    static bool available = false;
-    static double gset;
-    double fac, rsq, v1, v2;
-    if (!available)
-    {
-        do
-        {
-            v1 = 2.0 * rand() / double(RAND_MAX) - 1.0;
-            v2 = 2.0 * rand() / double(RAND_MAX) - 1.0;
-            rsq = v1 * v1 + v2 * v2;
-        } while (rsq >= 1.0 || rsq == 0.0);
-
-        fac = sqrt(-2.0 * log(rsq) / rsq);
-        gset = v1 * fac;
-        available = true;
-
-        return v2 * fac;
-    }
-    else
-    {
-
-        available = false;
-        return gset;
-    }
-}
-
 __global__ void initializeVelocitiesgaussdistRoutine(int *N, double *v[MAXPART][3])
 //>>>>>>> b7eac01ae33bac39cafccc0b8fd033e66d228f30
 {
     int threadId = blockDim.x * blockIdx.x + threadIdx.x;
     int start = (threadId * (*N) ) /  NUMTHREADS;
     int  end = ( (threadId + 1) * (*N)) / NUMTHREADS;
-
+ 
+    static bool available = false;
+    static double gset;
+    double fac, rsq, v1, v2;
+    int x; 
     int j;
 
 // TODO: Parallalize this  loop
@@ -972,7 +950,41 @@ __global__ void initializeVelocitiesgaussdistRoutine(int *N, double *v[MAXPART][
         for (j = 0; j < 3; j++)
         {
 //  Pull a number from a Gaussian Distribution
-            *v[i][j] = gaussdist();
+            
+            if (!available)
+            {
+                do
+                {
+                    curandState_t state;
+
+                    /* we have to initialize the state */
+                    curand_init(0, /* the seed controls the sequence of random values that are produced */
+                                0, /* the sequence number is only important with multiple cores */
+                                0, /* the offset is how much extra we advance in the sequence for each call, can be 0 */
+                                &state);
+
+                    /* curand works like rand - except that it takes a state as a parameter */
+
+                    x = curand(&state) % RAND_MAX ;
+                    v1 = 2.0 * x / double(RAND_MAX) - 1.0;
+                    x = curand(&state) % RAND_MAX ;
+                    v2 = 2.0 * x / double(RAND_MAX) - 1.0;
+
+                    rsq = v1 * v1 + v2 * v2;
+                } while (rsq >= 1.0 || rsq == 0.0);
+
+                fac = sqrt(-2.0 * log(rsq) / rsq);
+                gset = v1 * fac;
+                available = true;
+
+                *v[i][j] = v2 * fac;
+            }
+            else
+            {
+
+                available = false;
+                *v[i][j] = gset;
+            }
         }
     }
 
@@ -1091,7 +1103,6 @@ void initializeVelocities()
 
     cudaMemcpy( v_th, &v, sizedoublearray, cudaMemcpyHostToDevice);
     cudaMemcpy( N_th, &N, sizeint, cudaMemcpyHostToDevice);
-
 
     dim3 grid_size(1); //1 BLOCK
     dim3 block_size(NUMTHREADS); // 8 THREADS IN THE BLOCK
