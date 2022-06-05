@@ -29,8 +29,9 @@
 #include <string.h>
 #include <curand_kernel.h>
 #include <curand.h>
+#include <time.h>
 
-#define NUMTHREADS 8
+#define NUMTHREADS 16
 // Number of particles
 int N;
 
@@ -85,6 +86,9 @@ double Kinetic();
 
 int main()
 {
+
+    clock_t start, end;
+    start = clock();
 
     //  variable delcarations
     int i;
@@ -214,7 +218,7 @@ int main()
     printf("  NUMBER DENSITY OF LIQUID ARGON AT 1 ATM AND 87 K IS ABOUT 35000 moles/m^3\n");
 
     scanf("%lf", &rho);
-    N = 216;
+    N = 500;
     Vol = N / (rho * NA);
 
     Vol /= VolFac;
@@ -257,7 +261,7 @@ int main()
         //  We will run the simulation for NumTime timesteps.
         //  The total time will be NumTime*dt in natural units
         //  And NumTime*dt multiplied by the appropriate conversion factor for time in seconds
-        NumTime = 50000;
+        NumTime = 400;
     }
     else
     {
@@ -365,6 +369,10 @@ int main()
     fclose(tfp);
     fclose(ofp);
     fclose(afp);
+
+    end = clock();
+    double total_time = ((double) (end - start)) / CLOCKS_PER_SEC;
+    printf("\ninitializeVelocities took %f seconds to execute\n", total_time);
 
     return 0;
 }
@@ -554,7 +562,7 @@ double Kinetic()
     cudaMalloc( (void**)&partial_kins_array_dev, kinetic_arr_size);
     cudaMemcpy(partial_kins_array_dev, partial_kins_array, kinetic_arr_size, cudaMemcpyHostToDevice);
 
-    // Execute the routine 
+    // Execute the routine
     KineticRoutine<<<grid_size,block_size>>>(partial_kins_array_dev , m_dev , v_dev, N_dev);
     // copy the result
     cudaMemcpy(partial_kins_array, partial_kins_array_dev, kinetic_arr_size , cudaMemcpyDeviceToHost);
@@ -906,7 +914,7 @@ double VelocityVerlet(double dt, int iter, FILE *fp)
         fprintf(fp, "%s", atype);
         for (int j = 0; j < 3; j++)
         {
-            fprintf(fp, "  %12.10e ", r[i*3+j]);
+            fprintf(fp, "  %12.10e ", r[i][j]);
         }
         fprintf(fp, "\n");
     }
@@ -935,11 +943,11 @@ __global__ void initializeVelocitiesgaussdistRoutine(int *N, double *v[MAXPART][
     int threadId = blockDim.x * blockIdx.x + threadIdx.x;
     int start = (threadId * (*N) ) /  NUMTHREADS;
     int  end = ( (threadId + 1) * (*N)) / NUMTHREADS;
- 
+
     static bool available = false;
     static double gset;
     double fac, rsq, v1, v2;
-    int x; 
+    int x;
     int j;
 
 // TODO: Parallalize this  loop
@@ -950,7 +958,7 @@ __global__ void initializeVelocitiesgaussdistRoutine(int *N, double *v[MAXPART][
         for (j = 0; j < 3; j++)
         {
 //  Pull a number from a Gaussian Distribution
-            
+
             if (!available)
             {
                 do
@@ -1237,5 +1245,7 @@ void initializeVelocities()
     cudaFree( v_th );
     cudaFree( N_th );
     cudaFree( lambda_th );
+
+
 
 }
