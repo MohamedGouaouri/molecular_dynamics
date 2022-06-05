@@ -279,23 +279,31 @@ int main()
 
 
     }
-
-    int NumTime = 400;
+    
+    int NumTime = 50;
 
 
 
     //  Put all the atoms in simple crystal lattice and give them random velocities
     //  that corresponds to the initial temperature we have specified
-
+    MPI_Barrier(MPI_COMM_WORLD);
+    printf("rank = %d\n", rank);
+    printf("Before Init \n");
+    
     initialize();
+    
+    printf("Init done \n");
 
     // Sync here 
-    MPI_Barrier(MPI_COMM_WORLD);
+    //MPI_Barrier(MPI_COMM_WORLD);
 
+    printf("Compute acceleration started\n");
     //  Based on their positions, calculate the ininial intermolecular forces
     //  The accellerations of each particle will be defined from the forces and their
     //  mass, and this will allow us to update their positions via Newton's law
     computeAccelerations();
+    
+    printf("Compute acc before loop \n");
 
     // TODO: Should we sync here ?
 
@@ -320,9 +328,11 @@ int main()
     int reported = 0;
 
     for (i = 0; i < NumTime + 1; i++)
+    
     {
-        if (rank == root)
+	if (rank == root)
         {
+	    printf("Iteration: %d\n", i);
 
             //  This just prints updates on progress of the calculation for the users convenience
             if (i == tenp)
@@ -359,7 +369,8 @@ int main()
         {
             // Make reduction
             MPI_Reduce(&partialPress, &Press, 1, MPI_DOUBLE, MPI_SUM, root, MPI_COMM_WORLD);
-        }
+	    printf("Press %f\n", Press);
+	}
 
         // TODO: Should we sync processes here ?
 
@@ -372,14 +383,14 @@ int main()
         if (rank == root)
         {
             // Make reduction
-            MPI_Allreduce(&partialMVS, &mvs, 1, MPI_DOUBLE, MPI_SUM, root, MPI_COMM_WORLD);
+            MPI_Allreduce(&partialMVS, &mvs, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
         }
 
         partialKE = Kinetic();
         if (rank == root)
         {
             // Make reduction
-            MPI_Allreduce(&partialKE, &KE, 1, MPI_DOUBLE, MPI_SUM, root, MPI_COMM_WORLD);
+            MPI_Allreduce(&partialKE, &KE, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
         }
 
         // TODO: Should we sync processes here ?
@@ -388,7 +399,7 @@ int main()
         if (rank == root)
         {
             // Make reduction
-            MPI_Reduce(&partialPE, &PE, 1, MPI_DOUBLE, MPI_SUM, root, MPI_COMM_WORLD);
+            MPI_Reduce(&partialPE, &PE, 1, MPI_DOUBLE, MPI_SUM,root, MPI_COMM_WORLD);
             // TODO: Should we broadcat
         }
 
@@ -504,8 +515,10 @@ void initialize()
             }
         }
     }
-
+    printf("Before allgather of Initialize()\n");
     MPI_Allgather(r, 3*n, MPI_DOUBLE, r, 3*n, MPI_DOUBLE, MPI_COMM_WORLD);
+    printf("After allgather of Init %f\n", r[0][0]);
+
     // Call function to initialize velocities
     initializeVelocities();
 
@@ -625,24 +638,20 @@ void computeAccelerations()
     double f, rSqd;
     double rij[3]; // position of i relative to j
 
-    int chunk = N / size;
-    int startIdx = rank * chunk;
-    int endIdx = (rank + 1) * chunk;
+    if (rank == root)
+    {
+
+    	for (i = 0; i < N; i++)
+    	{ // set all accelerations to zero
+        	for (k = 0; k < 3; k++)
+        	{
+            		a[i][k] = 0;
+        	}
+    	}
 
 
-    for (i = startIdx; i < endIdx; i++)
-    { // set all accelerations to zero
-        for (k = 0; k < 3; k++)
-        {
-            a[i][k] = 0;
-        }
-    }
-
-    if(rank == root) MPI_Allgather(a, 3*N, MPI_DOUBLE, a, 3*N, MPI_DOUBLE, MPI_COMM_WORLD);
-
-
-    for (i = startIdx; i < endIdx; i++)
-    { // loop over all distinct pairs i,j
+    	for (i = 0; i < N; i++)
+    	{ // loop over all distinct pairs i,j
         for (j = i + 1; j < N; j++)
         {
             // initialize r^2 to zero
@@ -661,15 +670,14 @@ void computeAccelerations()
             //  From derivative of Lennard-Jones with sigma and epsilon set equal to 1 in natural units!
             f = 24 * (2 * pow(rSqd, -7) - pow(rSqd, -4));
             for (k = 0; k < 3; k++)
-            {
+             {
                 //  from F = ma, where m = 1 in natural units!
-                a[i][k] += rij[k] * f;
-                a[j][k] -= rij[k] * f;
+               		a[i][k] += rij[k] * f;
+                	a[j][k] -= rij[k] * f;
+            	}
             }
-        }
-    }
-
-    if(rank == root) MPI_Allgather(a, 3*N, MPI_DOUBLE, a, 3*N, MPI_DOUBLE, MPI_COMM_WORLD);
+    	}
+    }    
 }
 
 double VelocityVerlet(double dt, int iter, FILE *fp)
@@ -693,6 +701,7 @@ double VelocityVerlet(double dt, int iter, FILE *fp)
 
     //  Compute accelerations from forces at current position
     computeAccelerations();
+
 
     // Note: Processes must be in sync here
 
@@ -764,52 +773,6 @@ void initializeVelocities()
         }
     }
 
-    // Vcm = sum_i^N  m*v_i/  sum_i^N  M
-    // Compute center-of-mas velocity according to the formula above
-    double vCM[3] = {0, 0, 0};
-    double vCMi[3] = {0, 0, 0};
-
-    // Parallalize this  loop
-
-    for (i = start; i < end; i++)
-    {
-        for (j = 0; j < 3; j++)
-        {
-
-            vCMi[j] += m * v[i][j];
-        }
-    }
-
-    if(rank == root){
-
-        for (i = 0; i < 3; i++) {
-
-            MPI_Reduce(&vCMi[i], &vCM[i], 1, MPI_DOUBLE, MPI_SUM, root, MPI_COMM_WORLD);
-            vCM[i] /= N * m;
-
-        }
-
-        MPI_Bcast(vCM, 3, MPI_DOUBLE, root, MPI_COMM_WORLD);
-
-    }
-    
-    MPI_Barrier(MPI_COMM_WORLD);
-    
-    //  Subtract out the center-of-mass velocity from the
-    //  velocity of each particle... effectively set the
-    //  center of mass velocity to zero so that the system does
-    //  not drift in space!
-
-    // Parallalize this  loop
-
-    for (i = start; i < end; i++)
-    {
-        for (j = 0; j < 3; j++)
-        {
-
-            v[i][j] -= vCM[j];
-        }
-    }
 
     //  Now we want to scale the average velocity of the system
     //  by a factor which is consistent with our initial temperature, Tinit
