@@ -280,7 +280,7 @@ int main()
 
     }
 
-    int NumTime = 400;
+    int NumTime = 50;
 
 
 
@@ -372,14 +372,14 @@ int main()
         if (rank == root)
         {
             // Make reduction
-            MPI_Allreduce(&partialMVS, &mvs, 1, MPI_DOUBLE, MPI_SUM, root, MPI_COMM_WORLD);
+            MPI_Allreduce(&partialMVS, &mvs, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
         }
 
         partialKE = Kinetic();
         if (rank == root)
         {
             // Make reduction
-            MPI_Allreduce(&partialKE, &KE, 1, MPI_DOUBLE, MPI_SUM, root, MPI_COMM_WORLD);
+            MPI_Allreduce(&partialKE, &KE, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
         }
 
         // TODO: Should we sync processes here ?
@@ -388,7 +388,7 @@ int main()
         if (rank == root)
         {
             // Make reduction
-            MPI_Reduce(&partialPE, &PE, 1, MPI_DOUBLE, MPI_SUM, root, MPI_COMM_WORLD);
+            MPI_Reduce(&partialPE, &PE, 1, MPI_DOUBLE, MPI_SUM,root, MPI_COMM_WORLD);
             // TODO: Should we broadcat
         }
 
