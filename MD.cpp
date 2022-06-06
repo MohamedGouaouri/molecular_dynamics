@@ -64,7 +64,7 @@ double a[MAXPART][3];
 //  Force
 double F[MAXPART][3];
 int rank, size;
-
+    
 // atom type
 char atype[10];
 //  Function prototypes
@@ -268,37 +268,45 @@ int main()
         ofp = fopen(ofn, "w"); //  Output of other quantities (T, P, gc, etc) at every timestep
         afp = fopen(afn, "w"); //  Average T, P, gc, etc from the simulation
 
-        // Broadcast modified and needed variables
-
-        MPI_Bcast(&VolFac, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-        MPI_Bcast(&Vol, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-        MPI_Bcast(&TempFac, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-        MPI_Bcast(&timefac, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-        MPI_Bcast(&L, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-        MPI_Bcast(&PressFac, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
     }
+    
+    // Broadcast modified and needed variables
+    MPI_Bcast(&VolFac, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&Vol, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&TempFac, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&timefac, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&L, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&PressFac, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
+    
     int NumTime = 50;
+
+
 
     //  Put all the atoms in simple crystal lattice and give them random velocities
     //  that corresponds to the initial temperature we have specified
     MPI_Barrier(MPI_COMM_WORLD);
-    printf("rank = %d\n", rank);
     printf("Before Init \n");
+    
+    printf("rank before init = %d\n", rank);
 
     initialize();
+    
+    // printf("Init done %f\n", r[0][0]);
+    // printf("rank after init = %d\n", rank);
+    MPI_Barrier(MPI_COMM_WORLD);
+    // printf("rank = %d\n", rank);
 
-    printf("Init done \n");
 
-    // Sync here
-    // MPI_Barrier(MPI_COMM_WORLD);
+    // Sync here 
+    //MPI_Barrier(MPI_COMM_WORLD);
 
     printf("Compute acceleration started\n");
     //  Based on their positions, calculate the ininial intermolecular forces
     //  The accellerations of each particle will be defined from the forces and their
     //  mass, and this will allow us to update their positions via Newton's law
     computeAccelerations();
-
+    
     printf("Compute acc before loop \n");
 
     // TODO: Should we sync here ?
@@ -316,19 +324,21 @@ int main()
         printf("  PERCENTAGE OF CALCULATION COMPLETE:\n  [");
     }
 
-    // double start_simulation_time = omp_get_wtime();
+    double start_simulation_time = MPI_Wtime();
     long prev = time(NULL);
     long now;
 
     int tenp = floor(NumTime / 10);
     int reported = 0;
 
-    for (i = 0; i < NumTime + 1; i++)
+    MPI_Barrier(MPI_COMM_WORLD);
 
+    for (i = 0; i < NumTime + 1; i++)
+    
     {
         if (rank == root)
         {
-            printf("Iteration: %d\n", i);
+	    // printf("Iteration: %d\n", i);
 
             //  This just prints updates on progress of the calculation for the users convenience
             if (i == tenp)
@@ -352,8 +362,6 @@ int main()
             else if (i == 10 * tenp)
                 printf(" 100 ]\n");
             fflush(stdout);
-
-            // start = omp_get_wtime();
         }
 
         // This updates the positions and velocities using Newton's Laws
@@ -361,12 +369,8 @@ int main()
         // which is a Kinetic Theory of gasses concept of Pressure
         partialPress = VelocityVerlet(dt, i + 1, tfp);
         partialPress *= PressFac;
-        if (rank == root)
-        {
-            // Make reduction
-            MPI_Reduce(&partialPress, &Press, 1, MPI_DOUBLE, MPI_SUM, root, MPI_COMM_WORLD);
-            printf("Press %f\n", Press);
-        }
+        MPI_Allreduce(&partialPress, &Press, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+
 
         // TODO: Should we sync processes here ?
 
@@ -376,28 +380,16 @@ int main()
         //  Potential, and Kinetic Energy
         //  We would also like to use the IGL to try to see if we can extract the gas constant
         partialMVS = MeanSquaredVelocity();
-        if (rank == root)
-        {
-            // Make reduction
-            MPI_Allreduce(&partialMVS, &mvs, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-        }
+        MPI_Allreduce(&partialMVS, &mvs, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+
 
         partialKE = Kinetic();
-        if (rank == root)
-        {
-            // Make reduction
-            MPI_Allreduce(&partialKE, &KE, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-        }
+        MPI_Allreduce(&partialKE, &KE, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 
         // TODO: Should we sync processes here ?
 
         partialPE = Potential();
-        if (rank == root)
-        {
-            // Make reduction
-            MPI_Reduce(&partialPE, &PE, 1, MPI_DOUBLE, MPI_SUM, root, MPI_COMM_WORLD);
-            // TODO: Should we broadcat
-        }
+        MPI_Allreduce(&partialPE, &PE, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 
         // TODO: Should we sync processes here ?
 
@@ -422,10 +414,10 @@ int main()
 
         if (rank == 0)
         {
-            // end = omp_get_wtime();
+            end = MPI_Wtime();
             if (!reported)
             {
-                printf("Execution time of 1 iteration is %f\n", cpu_time_used);
+                printf("Execution time of 1 iteration is %f\n", end - start);
                 reported = 1;
             }
             now = time(NULL);
@@ -441,9 +433,9 @@ int main()
 
     if (rank == root)
     {
-        // double end_simulation_time = omp_get_wtime();
-        // cpu_time_used = end_simulation_time - start_simulation_time;
-        // printf("Execution time the simulation is %f\n", cpu_time_used);
+        double end_simulation_time = MPI_Wtime();
+        cpu_time_used = end_simulation_time - start_simulation_time;
+        printf("Execution time the simulation is %f\n", cpu_time_used);
 
         // Because we have calculated the instantaneous temperature and pressure,
         // we can take the average over the whole simulation here
@@ -478,6 +470,7 @@ int main()
 
 void initialize()
 {
+
     int n, p, i, j, k;
     double pos;
 
@@ -490,7 +483,7 @@ void initialize()
     //  index for number of particles assigned positions
     p = 0;
     //  initialize positions
-    int num_iter = n / size;
+    int num_iter = n/size;
     int start = rank * num_iter;
     int end = start + num_iter;
 
@@ -511,9 +504,9 @@ void initialize()
             }
         }
     }
-    printf("Before allgather of Initialize()\n");
-    MPI_Allgather(r, 3 * n, MPI_DOUBLE, r, 3 * n, MPI_DOUBLE, MPI_COMM_WORLD);
-    printf("After allgather of Init %f\n", r[0][0]);
+    // printf("Before allgather of Initialize()\n");
+    MPI_Allgather(r, 3*n, MPI_DOUBLE, r, 3*n, MPI_DOUBLE, MPI_COMM_WORLD);
+    // printf("After allgather of Init %f\n", r[0][0]);
 
     // Call function to initialize velocities
     initializeVelocities();
@@ -541,9 +534,10 @@ double MeanSquaredVelocity()
     double vz2 = 0;
     double v2;
 
-    int num_iter = N / size;
+    int num_iter = N/size;
     int start = rank * num_iter;
     int end = start + num_iter;
+
 
     for (int i = start; i < end; i++)
     {
@@ -561,6 +555,7 @@ double MeanSquaredVelocity()
 //  Function to calculate the kinetic energy of the system
 double Kinetic()
 { // Write Function here!
+
 
     int chunk = N / size;
     int startIdx = rank * chunk;
@@ -632,43 +627,47 @@ void computeAccelerations()
     double f, rSqd;
     double rij[3]; // position of i relative to j
 
+    // printf("rank inside computeAccelerations = %d\n", rank);
     if (rank == root)
     {
 
-        for (i = 0; i < N; i++)
-        { // set all accelerations to zero
+    	for (i = 0; i < N; i++)
+    	{ // set all accelerations to zero
+        	for (k = 0; k < 3; k++)
+        	{
+            		a[i][k] = 0;
+        	}
+    	}
+
+
+    	for (i = 0; i < N; i++)
+    	{ // loop over all distinct pairs i,j
+        for (j = i + 1; j < N; j++)
+        {
+            // initialize r^2 to zero
+            rSqd = 0;
+
             for (k = 0; k < 3; k++)
             {
-                a[i][k] = 0;
+                //  component-by-componenent position of i relative to j
+                rij[k] = r[i][k] - r[j][k];
+                //  sum of squares of the components
+                rSqd += rij[k] * rij[k];
             }
-        }
 
-        for (i = 0; i < N; i++)
-        { // loop over all distinct pairs i,j
-            for (j = i + 1; j < N; j++)
-            {
-                // initialize r^2 to zero
-                rSqd = 0;
 
-                for (k = 0; k < 3; k++)
-                {
-                    //  component-by-componenent position of i relative to j
-                    rij[k] = r[i][k] - r[j][k];
-                    //  sum of squares of the components
-                    rSqd += rij[k] * rij[k];
-                }
 
-                //  From derivative of Lennard-Jones with sigma and epsilon set equal to 1 in natural units!
-                f = 24 * (2 * pow(rSqd, -7) - pow(rSqd, -4));
-                for (k = 0; k < 3; k++)
-                {
-                    //  from F = ma, where m = 1 in natural units!
-                    a[i][k] += rij[k] * f;
-                    a[j][k] -= rij[k] * f;
-                }
+            //  From derivative of Lennard-Jones with sigma and epsilon set equal to 1 in natural units!
+            f = 24 * (2 * pow(rSqd, -7) - pow(rSqd, -4));
+            for (k = 0; k < 3; k++)
+             {
+                //  from F = ma, where m = 1 in natural units!
+               		a[i][k] += rij[k] * f;
+                	a[j][k] -= rij[k] * f;
+            	}
             }
-        }
-    }
+    	}
+    }    
 }
 
 double VelocityVerlet(double dt, int iter, FILE *fp)
@@ -692,6 +691,7 @@ double VelocityVerlet(double dt, int iter, FILE *fp)
 
     //  Compute accelerations from forces at current position
     computeAccelerations();
+
 
     // Note: Processes must be in sync here
 
@@ -746,8 +746,9 @@ double VelocityVerlet(double dt, int iter, FILE *fp)
 void initializeVelocities()
 {
 
+
     int i, j;
-    int num_iter = N / size;
+    int num_iter = N/size;
     int start = rank * num_iter;
     int end = start + num_iter;
 
@@ -762,6 +763,50 @@ void initializeVelocities()
             v[i][j] = gaussdist();
         }
     }
+
+    // Vcm = sum_i^N  m*v_i/  sum_i^N  M
+    // Compute center-of-mas velocity according to the formula above
+    double vCM[3] = {0, 0, 0};
+    double vCMi[3] = {0, 0, 0};
+
+    // Parallalize this  loop
+
+    for (i = start; i < end; i++)
+    {
+        for (j = 0; j < 3; j++)
+        {
+
+            vCMi[j] += m * v[i][j];
+        }
+    }
+
+
+
+    for (i = 0; i < 3; i++) {
+        MPI_Reduce(&vCMi[i], &vCM[i], 1, MPI_DOUBLE, MPI_SUM, root, MPI_COMM_WORLD);
+        vCM[i] /= N * m;
+    }
+
+    MPI_Bcast(vCM, 3, MPI_DOUBLE, root, MPI_COMM_WORLD);
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    
+    //  Subtract out the center-of-mass velocity from the
+    //  velocity of each particle... effectively set the
+    //  center of mass velocity to zero so that the system does
+    //  not drift in space!
+
+    // Parallalize this  loop
+
+    for (i = start; i < end; i++)
+    {
+        for (j = 0; j < 3; j++)
+        {
+
+            v[i][j] -= vCM[j];
+        }
+    }
+
 
     //  Now we want to scale the average velocity of the system
     //  by a factor which is consistent with our initial temperature, Tinit
@@ -780,15 +825,19 @@ void initializeVelocities()
         }
     }
 
-    if (rank == root)
-    {
-        MPI_Reduce(&vSqdSumi, &vSqdSum, 1, MPI_DOUBLE, MPI_SUM, root, MPI_COMM_WORLD);
+
+    
+
+    
+    MPI_Reduce(&vSqdSumi, &vSqdSum, 1, MPI_DOUBLE, MPI_SUM, root, MPI_COMM_WORLD);
+    if(rank == root) {
         lambda = sqrt(3 * (N - 1) * Tinit / vSqdSum);
-        MPI_Bcast(&lambda, 1, MPI_DOUBLE, root, MPI_COMM_WORLD);
     }
+    MPI_Bcast(&lambda, 1, MPI_DOUBLE, root, MPI_COMM_WORLD);
 
     // Parallalize this  loop
 
+    // printf("rank inside init velocities = %d\n", rank);
     for (i = start; i < end; i++)
     {
         for (j = 0; j < 3; j++)
@@ -798,8 +847,8 @@ void initializeVelocities()
         }
     }
 
-    if (rank == root)
-        MPI_Allgather(v, 3 * N, MPI_DOUBLE, v, 3 * N, MPI_DOUBLE, MPI_COMM_WORLD);
+    MPI_Allgather(v, 3*N, MPI_DOUBLE, v, 3*N, MPI_DOUBLE, MPI_COMM_WORLD);
+    printf("Velocity %f\n", v[0][0]);
 }
 
 //  Numerical recipes Gaussian distribution number generator
