@@ -39,7 +39,7 @@ int root = 0;
 int N = 500;
 
 // Number of threads
-#define NUMTHREADS 2
+#define NUMTHREADS 4
 
 //  Lennard-Jones parameters in natural units!
 double sigma = 1.;
@@ -291,32 +291,16 @@ int main()
     //  Put all the atoms in simple crystal lattice and give them random velocities
     //  that corresponds to the initial temperature we have specified
     MPI_Barrier(MPI_COMM_WORLD);
-    printf("Before Init \n");
-    
-    printf("rank before init = %d\n", rank);
 
     initialize();
-
-    printf("rank after init %d \n", rank);
     
-    // printf("Init done %f\n", r[0][0]);
-    // printf("rank after init = %d\n", rank);
     MPI_Barrier(MPI_COMM_WORLD);
-    // printf("rank = %d\n", rank);
 
-
-    // Sync here 
-    //MPI_Barrier(MPI_COMM_WORLD);
-
-    printf("Compute acceleration started\n");
     //  Based on their positions, calculate the ininial intermolecular forces
     //  The accellerations of each particle will be defined from the forces and their
     //  mass, and this will allow us to update their positions via Newton's law
     computeAccelerations();
-    
-    printf("Compute acc before loop \n");
 
-    // TODO: Should we sync here ?
 
     if (rank == root)
     {
@@ -346,7 +330,6 @@ int main()
     {
         if (rank == root)
         {
-	    // printf("Iteration: %d\n", i);
 
             //  This just prints updates on progress of the calculation for the users convenience
             if (i == tenp)
@@ -515,13 +498,10 @@ void initialize()
             }
         }
     }
-    printf("Before allgather of Initialize()\n");
     MPI_Allgather(r, 3*n, MPI_DOUBLE, r, 3*n, MPI_DOUBLE, MPI_COMM_WORLD);
-    printf("After allgather of Init %f\n", r[0][0]);
 
     // Call function to initialize velocities
     initializeVelocities();
-    printf("After initVel of Init \n");
 
 
     /***********************************************
@@ -564,7 +544,6 @@ double MeanSquaredVelocity()
     
     v2 = (vx2 + vy2 + vz2) / N;
 
-    // printf("  Average of x-component of velocity squared is %f\n",v2);
     return v2;
 }
 
@@ -644,8 +623,6 @@ void computeAccelerations()
     int i, j, k;
     double f, rSqd;
     double rij[3]; // position of i relative to j
-
-    // printf("rank inside computeAccelerations = %d\n", rank);
 
     if (rank == root)
     {
@@ -814,23 +791,17 @@ void initializeVelocities()
         }
     }
 
-    printf("Before small loop in initVel\n");
-
 
     for (i = 0; i < 3; i++) {
         MPI_Reduce(&vCMi[i], &vCM[i], 1, MPI_DOUBLE, MPI_SUM, root, MPI_COMM_WORLD);
         vCM[i] /= N * m;
     }
 
-    printf("Before bcast in initVel\n");
-
     MPI_Bcast(vCM, 3, MPI_DOUBLE, root, MPI_COMM_WORLD);
 
-    printf("After bcast in initVel\n");
 
     MPI_Barrier(MPI_COMM_WORLD);
 
-    printf("After barrier in initVel\n");
 
     
     //  Subtract out the center-of-mass velocity from the
@@ -868,7 +839,6 @@ void initializeVelocities()
 
     
     MPI_Reduce(&vSqdSumi, &vSqdSum, 1, MPI_DOUBLE, MPI_SUM, root, MPI_COMM_WORLD);
-    printf("After reduce in initVel\n");
     
 
 
@@ -877,8 +847,6 @@ void initializeVelocities()
     }
     MPI_Bcast(&lambda, 1, MPI_DOUBLE, root, MPI_COMM_WORLD);
 
-
-    // printf("rank inside init velocities = %d\n", rank);
     #pragma omp parallel for 
     for (i = start; i < end; i++)
     {
@@ -890,7 +858,6 @@ void initializeVelocities()
     }
 
     MPI_Allgather(v, 3*N, MPI_DOUBLE, v, 3*N, MPI_DOUBLE, MPI_COMM_WORLD);
-    printf("Velocity %f\n", v[0][0]);
     return ;
 }
 
