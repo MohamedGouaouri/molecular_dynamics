@@ -658,34 +658,34 @@ void computeAccelerations()
         	}
     	}
 
-        #pragma omp parallel for schedule(dynamic) 
+        // #pragma omp parallel for schedule(dynamic) shared()
     	for (i = 0; i < N; i++)
-    	{ // loop over all distinct pairs i,j
-        for (j = i + 1; j < N; j++)
-        {
-            // initialize r^2 to zero
-            rSqd = 0;
+            { // loop over all distinct pairs i,j
+                for (j = i + 1; j < N; j++)
+                    {
+                        // initialize r^2 to zero
+                        rSqd = 0;
 
-            for (k = 0; k < 3; k++)
-            {
-                //  component-by-componenent position of i relative to j
-                rij[k] = r[i][k] - r[j][k];
-                //  sum of squares of the components
-                rSqd += rij[k] * rij[k];
+                        for (k = 0; k < 3; k++)
+                        {
+                            //  component-by-componenent position of i relative to j
+                            rij[k] = r[i][k] - r[j][k];
+                            //  sum of squares of the components
+                            rSqd += rij[k] * rij[k];
+                        }
+
+
+
+                        //  From derivative of Lennard-Jones with sigma and epsilon set equal to 1 in natural units!
+                        f = 24 * (2 * pow(rSqd, -7) - pow(rSqd, -4));
+                        for (k = 0; k < 3; k++)
+                        {
+                            //  from F = ma, where m = 1 in natural units!
+                                a[i][k] += rij[k] * f;
+                                a[j][k] -= rij[k] * f;
+                            }
+                    }
             }
-
-
-
-            //  From derivative of Lennard-Jones with sigma and epsilon set equal to 1 in natural units!
-            f = 24 * (2 * pow(rSqd, -7) - pow(rSqd, -4));
-            for (k = 0; k < 3; k++)
-             {
-                //  from F = ma, where m = 1 in natural units!
-               		a[i][k] += rij[k] * f;
-                	a[j][k] -= rij[k] * f;
-            	}
-            }
-    	}
     }    
 }
 
