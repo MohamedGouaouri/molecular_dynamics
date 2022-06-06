@@ -496,7 +496,7 @@ void initialize()
     int end = start + num_iter;
 
 
-    #pragma omp parallel for schedule(dynamic, N/NUMTHREADS) 
+    #pragma omp parallel for 
     for (i = start; i < end; i++)
     {
         for (j = 0; j < n; j++)
@@ -788,7 +788,7 @@ void initializeVelocities()
     int end = start + num_iter;
 
 
-    #pragma omp parallel for schedule(dynamic, N/NUMTHREADS) 
+    #pragma omp parallel for 
     for (i = start; i < end; i++)
     {
 
@@ -804,7 +804,7 @@ void initializeVelocities()
     double vCM[3] = {0, 0, 0};
     double vCMi[3] = {0, 0, 0};
 
-    #pragma omp parallel for schedule(dynamic, N/NUMTHREADS) num_threads(NUMTHREADS)
+    #pragma omp parallel for 
     for (i = start; i < end; i++)
     {
         for (j = 0; j < 3; j++)
@@ -838,7 +838,7 @@ void initializeVelocities()
     //  center of mass velocity to zero so that the system does
     //  not drift in space!
 
-    #pragma omp parallel for schedule(dynamic, N/NUMTHREADS)
+    #pragma omp parallel for 
     for (i = start; i < end; i++)
     {
         for (j = 0; j < 3; j++)
@@ -879,7 +879,7 @@ void initializeVelocities()
 
 
     // printf("rank inside init velocities = %d\n", rank);
-    #pragma omp parallel for schedule(dynamic, N/NUMTHREADS)
+    #pragma omp parallel for 
     for (i = start; i < end; i++)
     {
         for (j = 0; j < 3; j++)
