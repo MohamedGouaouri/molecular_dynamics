@@ -36,7 +36,7 @@ double start, end, cpu_time_used;
 int root = 0;
 
 // Number of particles
-int N = 500;
+int N = 200;
 
 //  Lennard-Jones parameters in natural units!
 double sigma = 1.;
@@ -286,28 +286,19 @@ int main()
     //  Put all the atoms in simple crystal lattice and give them random velocities
     //  that corresponds to the initial temperature we have specified
     MPI_Barrier(MPI_COMM_WORLD);
-    printf("Before Init \n");
-    
-    printf("rank before init = %d\n", rank);
-
     initialize();
     
-    // printf("Init done %f\n", r[0][0]);
-    // printf("rank after init = %d\n", rank);
     MPI_Barrier(MPI_COMM_WORLD);
-    // printf("rank = %d\n", rank);
 
 
     // Sync here 
     //MPI_Barrier(MPI_COMM_WORLD);
 
-    printf("Compute acceleration started\n");
     //  Based on their positions, calculate the ininial intermolecular forces
     //  The accellerations of each particle will be defined from the forces and their
     //  mass, and this will allow us to update their positions via Newton's law
     computeAccelerations();
     
-    printf("Compute acc before loop \n");
 
     // TODO: Should we sync here ?
 
@@ -338,7 +329,6 @@ int main()
     {
         if (rank == root)
         {
-	    // printf("Iteration: %d\n", i);
 
             //  This just prints updates on progress of the calculation for the users convenience
             if (i == tenp)
@@ -848,7 +838,6 @@ void initializeVelocities()
     }
 
     MPI_Allgather(v, 3*N, MPI_DOUBLE, v, 3*N, MPI_DOUBLE, MPI_COMM_WORLD);
-    printf("Velocity %f\n", v[0][0]);
 }
 
 //  Numerical recipes Gaussian distribution number generator
