@@ -31,7 +31,7 @@
 #include <curand.h>
 #include <time.h>
 
-#define NUMTHREADS 16
+#define NUMTHREADS 4
 // Number of particles
 int N;
 
@@ -95,8 +95,8 @@ int main()
     double dt, Vol, Temp, Press, Pavg, Tavg, rho;
     double VolFac, TempFac, PressFac, timefac;
     double KE, PE, mvs, gc, Z;
-    char trash[10000], prefix[1000], tfn[1000], ofn[1000], afn[1000];
-    FILE *infp, *tfp, *ofp, *afp;
+    char prefix[1000], tfn[1000], ofn[1000], afn[1000];
+    FILE *tfp, *ofp, *afp;
 
     printf("\n  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
     printf("                  WELCOME TO WILLY P CHEM MD!\n");
@@ -218,7 +218,7 @@ int main()
     printf("  NUMBER DENSITY OF LIQUID ARGON AT 1 ATM AND 87 K IS ABOUT 35000 moles/m^3\n");
 
     scanf("%lf", &rho);
-    N = 500;
+    N = 200;
     Vol = N / (rho * NA);
 
     Vol /= VolFac;
@@ -261,7 +261,7 @@ int main()
         //  We will run the simulation for NumTime timesteps.
         //  The total time will be NumTime*dt in natural units
         //  And NumTime*dt multiplied by the appropriate conversion factor for time in seconds
-        NumTime = 400;
+        NumTime = 5000;
     }
     else
     {
@@ -372,7 +372,7 @@ int main()
 
     end = clock();
     double total_time = ((double) (end - start)) / CLOCKS_PER_SEC;
-    printf("\ninitializeVelocities took %f seconds to execute\n", total_time);
+    printf("\Exection Time is %f seconds \n", total_time);
 
     return 0;
 }
