@@ -38,6 +38,9 @@ int root = 0;
 // Number of particles
 int N = 500;
 
+// Number of threads
+#define NUMTHREADS 2
+
 //  Lennard-Jones parameters in natural units!
 double sigma = 1.;
 double epsilon = 1.;
@@ -92,6 +95,8 @@ int main()
 {
 
     MPI_Init(NULL, NULL);
+
+    omp_set_num_threads(NUMTHREADS);
 
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -279,7 +284,7 @@ int main()
     MPI_Bcast(&PressFac, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
     
-    int NumTime = 50;
+    int NumTime = 400;
 
 
 
@@ -291,6 +296,8 @@ int main()
     printf("rank before init = %d\n", rank);
 
     initialize();
+
+    printf("rank after init %d \n", rank);
     
     // printf("Init done %f\n", r[0][0]);
     // printf("rank after init = %d\n", rank);
@@ -332,6 +339,7 @@ int main()
     int reported = 0;
 
     MPI_Barrier(MPI_COMM_WORLD);
+
 
     for (i = 0; i < NumTime + 1; i++)
     
@@ -487,6 +495,8 @@ void initialize()
     int start = rank * num_iter;
     int end = start + num_iter;
 
+
+    #pragma omp parallel for schedule(dynamic, N/NUMTHREADS) 
     for (i = start; i < end; i++)
     {
         for (j = 0; j < n; j++)
@@ -499,17 +509,20 @@ void initialize()
                     r[p][0] = (i + 0.5) * pos;
                     r[p][1] = (j + 0.5) * pos;
                     r[p][2] = (k + 0.5) * pos;
+                    
                 }
                 p++;
             }
         }
     }
-    // printf("Before allgather of Initialize()\n");
+    printf("Before allgather of Initialize()\n");
     MPI_Allgather(r, 3*n, MPI_DOUBLE, r, 3*n, MPI_DOUBLE, MPI_COMM_WORLD);
-    // printf("After allgather of Init %f\n", r[0][0]);
+    printf("After allgather of Init %f\n", r[0][0]);
 
     // Call function to initialize velocities
     initializeVelocities();
+    printf("After initVel of Init \n");
+
 
     /***********************************************
   *   Uncomment if you want to see what the initial positions and velocities are
@@ -538,14 +551,17 @@ double MeanSquaredVelocity()
     int start = rank * num_iter;
     int end = start + num_iter;
 
-
-    for (int i = start; i < end; i++)
+    #pragma omp parallel shared (v) 
     {
-
-        vx2 = vx2 + v[i][0] * v[i][0];
-        vy2 = vy2 + v[i][1] * v[i][1];
-        vz2 = vz2 + v[i][2] * v[i][2];
+        #pragma omp for reduction (+: vx2) reduction (+: vy2) reduction (+: vz2)
+        for (int i = start; i < end; i++)
+        {
+            vx2 = vx2 + v[i][0] * v[i][0];
+            vy2 = vy2 + v[i][1] * v[i][1];
+            vz2 = vz2 + v[i][2] * v[i][2];
+        }
     }
+    
     v2 = (vx2 + vy2 + vz2) / N;
 
     // printf("  Average of x-component of velocity squared is %f\n",v2);
@@ -564,7 +580,8 @@ double Kinetic()
     double v2, kin;
 
     kin = 0.;
-
+    
+    #pragma omp parallel for reduction (+: kin) private (v2)
     for (int i = startIdx; i < endIdx; i++)
     {
 
@@ -593,6 +610,7 @@ double Potential()
 
     Pot = 0.;
 
+    #pragma omp parallel for reduction (+: Pot) private (r2)
     for (i = startIdx; i < endIdx; i++)
     {
         for (j = 0; j < N; j++)
@@ -628,9 +646,10 @@ void computeAccelerations()
     double rij[3]; // position of i relative to j
 
     // printf("rank inside computeAccelerations = %d\n", rank);
+
     if (rank == root)
     {
-
+        #pragma omp parallel for
     	for (i = 0; i < N; i++)
     	{ // set all accelerations to zero
         	for (k = 0; k < 3; k++)
@@ -639,7 +658,7 @@ void computeAccelerations()
         	}
     	}
 
-
+        #pragma omp parallel for schedule(dynamic) 
     	for (i = 0; i < N; i++)
     	{ // loop over all distinct pairs i,j
         for (j = i + 1; j < N; j++)
@@ -697,47 +716,63 @@ double VelocityVerlet(double dt, int iter, FILE *fp)
 
     //  Update positions and velocity with current velocity and acceleration
     // printf("  Updated Positions!\n");
-    for (i = startIdx; i < endIdx; i++)
+    #pragma omp parallel shared(r, a, v, dt)
     {
-        for (j = 0; j < 3; j++)
+        #pragma omp for 
+        for (i = startIdx; i < endIdx; i++)
         {
-            r[i][j] += v[i][j] * dt + 0.5 * a[i][j] * dt * dt;
+            for (j = 0; j < 3; j++)
+            {
+                r[i][j] += v[i][j] * dt + 0.5 * a[i][j] * dt * dt;
 
-            v[i][j] += 0.5 * a[i][j] * dt;
+                v[i][j] += 0.5 * a[i][j] * dt;
+            }
+            // printf("  %i  %6.4e   %6.4e   %6.4e\n",i,r[i][0],r[i][1],r[i][2]);
         }
-        // printf("  %i  %6.4e   %6.4e   %6.4e\n",i,r[i][0],r[i][1],r[i][2]);
     }
+    
     //  Update accellerations from updated positions
     computeAccelerations();
 
     // Note: Processes must be in sync here
 
     //  Update velocity with updated acceleration
-    for (i = startIdx; i < endIdx; i++)
+    #pragma omp parallel shared(a, v, dt)
     {
-        for (j = 0; j < 3; j++)
+        #pragma omp for
+        for (i = startIdx; i < endIdx; i++)
         {
-            v[i][j] += 0.5 * a[i][j] * dt;
+            for (j = 0; j < 3; j++)
+            {
+                v[i][j] += 0.5 * a[i][j] * dt;
+            }
+        }
+    }
+    
+
+    // Elastic walls
+    #pragma omp parallel shared(r, v, m, dt, L)
+    {
+        #pragma omp for reduction(+: psum)
+        for (i = startIdx; i < endIdx; i++)
+        {
+            for (j = 0; j < 3; j++)
+            {
+                if (r[i][j] < 0.)
+                {
+                    v[i][j] *= -1.;                     //- elastic walls
+                    psum += 2 * m * fabs(v[i][j]) / dt; // contribution to pressure from "left" walls
+                }
+                if (r[i][j] >= L)
+                {
+                    v[i][j] *= -1.;                     //- elastic walls
+                    psum += 2 * m * fabs(v[i][j]) / dt; // contribution to pressure from "right" walls
+                }
+            }
         }
     }
 
-    // Elastic walls
-    for (i = startIdx; i < endIdx; i++)
-    {
-        for (j = 0; j < 3; j++)
-        {
-            if (r[i][j] < 0.)
-            {
-                v[i][j] *= -1.;                     //- elastic walls
-                psum += 2 * m * fabs(v[i][j]) / dt; // contribution to pressure from "left" walls
-            }
-            if (r[i][j] >= L)
-            {
-                v[i][j] *= -1.;                     //- elastic walls
-                psum += 2 * m * fabs(v[i][j]) / dt; // contribution to pressure from "right" walls
-            }
-        }
-    }
+    
 
     return psum /
            (6 * L * L);
@@ -752,8 +787,8 @@ void initializeVelocities()
     int start = rank * num_iter;
     int end = start + num_iter;
 
-    // TODO: Parallalize this  loop
 
+    #pragma omp parallel for schedule(dynamic, N/NUMTHREADS) 
     for (i = start; i < end; i++)
     {
 
@@ -769,8 +804,7 @@ void initializeVelocities()
     double vCM[3] = {0, 0, 0};
     double vCMi[3] = {0, 0, 0};
 
-    // Parallalize this  loop
-
+    #pragma omp parallel for schedule(dynamic, N/NUMTHREADS) num_threads(NUMTHREADS)
     for (i = start; i < end; i++)
     {
         for (j = 0; j < 3; j++)
@@ -780,6 +814,7 @@ void initializeVelocities()
         }
     }
 
+    printf("Before small loop in initVel\n");
 
 
     for (i = 0; i < 3; i++) {
@@ -787,17 +822,23 @@ void initializeVelocities()
         vCM[i] /= N * m;
     }
 
+    printf("Before bcast in initVel\n");
+
     MPI_Bcast(vCM, 3, MPI_DOUBLE, root, MPI_COMM_WORLD);
 
+    printf("After bcast in initVel\n");
+
     MPI_Barrier(MPI_COMM_WORLD);
+
+    printf("After barrier in initVel\n");
+
     
     //  Subtract out the center-of-mass velocity from the
     //  velocity of each particle... effectively set the
     //  center of mass velocity to zero so that the system does
     //  not drift in space!
 
-    // Parallalize this  loop
-
+    #pragma omp parallel for schedule(dynamic, N/NUMTHREADS)
     for (i = start; i < end; i++)
     {
         for (j = 0; j < 3; j++)
@@ -814,8 +855,7 @@ void initializeVelocities()
     vSqdSum = 0.;
     double vSqdSumi = 0.;
 
-    // Parallalize this  loop
-
+    #pragma omp parallel for reduction(+: vSqdSumi)
     for (i = start; i < end; i++)
     {
         for (j = 0; j < 3; j++)
@@ -827,17 +867,19 @@ void initializeVelocities()
 
 
     
-
-    
     MPI_Reduce(&vSqdSumi, &vSqdSum, 1, MPI_DOUBLE, MPI_SUM, root, MPI_COMM_WORLD);
+    printf("After reduce in initVel\n");
+    
+
+
     if(rank == root) {
         lambda = sqrt(3 * (N - 1) * Tinit / vSqdSum);
     }
     MPI_Bcast(&lambda, 1, MPI_DOUBLE, root, MPI_COMM_WORLD);
 
-    // Parallalize this  loop
 
     // printf("rank inside init velocities = %d\n", rank);
+    #pragma omp parallel for schedule(dynamic, N/NUMTHREADS)
     for (i = start; i < end; i++)
     {
         for (j = 0; j < 3; j++)
@@ -849,6 +891,7 @@ void initializeVelocities()
 
     MPI_Allgather(v, 3*N, MPI_DOUBLE, v, 3*N, MPI_DOUBLE, MPI_COMM_WORLD);
     printf("Velocity %f\n", v[0][0]);
+    return ;
 }
 
 //  Numerical recipes Gaussian distribution number generator
